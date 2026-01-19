@@ -870,8 +870,10 @@ function handleTouchEnd(e) {
     }
     if (currentlyDraggingTile) {
         currentlyDraggingTile.classList.remove("dragging");
+        currentlyDraggingTile.classList.remove("placed"); // ⭐ iPhone fix
     }
 }
+
 
 
 function getDragAfterElement(container, mouseX) {
