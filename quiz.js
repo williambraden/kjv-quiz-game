@@ -862,6 +862,8 @@ function handleTouchMove(e) {
         tileContainer.appendChild(currentlyDraggingTile);
         currentlyDraggingTile.classList.remove("placed");
     }
+	updateScrambleFeedback();
+
 }
 
 function handleTouchEnd(e) {
@@ -874,6 +876,8 @@ function handleTouchEnd(e) {
         currentlyDraggingTile.classList.remove("dragging");
         currentlyDraggingTile.classList.remove("placed"); // ⭐ iPhone fix
     }
+	updateScrambleFeedback();
+
 }
 
 
