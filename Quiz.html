@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Bible Quiz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+/* --- Your existing CSS preserved exactly as-is --- */
+/* (I did not modify any styling here — only the HTML structure below changes) */
+
+.active-player {
+  font-weight: bold;
+  color: #2a9d8f;
+  background-color: #f0fdfa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  animation: glowPulse 1s ease-in-out;
+}
+
+@keyframes glowPulse {
+  0%   { box-shadow: 0 0 0px #2a9d8f; }
+  50%  { box-shadow: 0 0 10px #2a9d8f; }
+  100% { box-shadow: 0 0 0px #2a9d8f; }
+}
+
+.score-flash {
+  background-color: #ffe066;
+  transition: background-color 0.3s ease;
+}
+
+.score-glow {
+  animation: glowPulse 0.6s ease-in-out;
+}
+
+@keyframes glowPulse {
+  0%   { text-shadow: 0 0 0px #2a9d8f; }
+  50%  { text-shadow: 0 0 8px #2a9d8f; }
+  100% { text-shadow: 0 0 0px #2a9d8f; }
+}
+
+body { font-family: Arial, sans-serif; margin: 20px; }
+button { margin: 5px; padding: 8px 12px; margin-top: 5px; }
+#quiz { margin-bottom: 20px; }
+#scoreboard { margin-top: 15px; border: 1px solid #ccc; padding: 10px; }
+button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+  body { margin: 10px; font-size: 16px; }
+  h1 { font-size: 22px; text-align: center; }
+  #scoreboard { font-size: 14px; }
+  button, input[type="text"], input[type="number"], select {
+    width: 100%; font-size: 16px; margin: 8px 0; padding: 8px;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+  body { font-size: 15px; }
+  button, input[type="text"], input[type="number"], select {
+    width: 80%; font-size: 15px;
+  }
+}
+
+@media (max-width: 600px) {
+  .podiumContent h3 { font-size: 1.1em !important; }
+  .podiumContent p { font-size: 0.85em !important; line-height: 1.2em; }
+}
+
+/* Scramble tiles */
+.tile-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.tile { padding: 8px 12px; white-space: normal; background: #eee; border: 1px solid #ccc; border-radius: 6px; cursor: grab; user-select: none; }
+.drop-container { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 12px; min-height: 80px; border: 2px dashed #888; border-radius: 6px; background: #fafafa; width: 100%; box-sizing: border-box; }
+.tile.placed { background: #d9f7d9; border-color: #8bc98b; cursor: default; }
+.tile.dragging { opacity: 0.3; }
+.correct-word { background-color: #4caf50; color: white; }
+.incorrect-word { background-color: #f44336; color: white; }
+
+/* Redemption overlay */
+.redeem-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+}
+.redeem-box {
+  background: #ffffff; padding: 25px 35px; border-radius: 12px;
+  text-align: center; font-size: 1.4em; max-width: 500px; width: 90%;
+  box-shadow: 0 0 25px rgba(0,0,0,0.4);
+  animation: fadeIn 0.2s ease-out;
+}
+.redeem-box button { margin: 10px; padding: 10px 18px; font-size: 1rem; cursor: pointer; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+</style>
+</head>
+
+<body>
+  <!-- Scoreboard always visible on menu -->
+  <div id="scoreboard"></div>
+<!-- ========================================================= -->
+<!--  SCREEN 1: MAIN MENU                                      -->
+<!-- ========================================================= -->
+<div id="screenMenu">
+  <h1>Bible Quiz</h1>
+
+
+
+  <!-- Mode Selector -->
+  <div id="modeSelector">
+    <button id="singlePlayerBtn">Single Player</button>
+    <button id="localMultiplayerBtn">Local Multiplayer</button>
+    <p>Select a mode above to begin.</p> 
+	 <button id="resetBtn" onclick="resetScores()">Reset Scores</button>
+	</div>
+
+  <!-- Main Menu Content -->
+  <div id="menu">
+    
+    <div id="scoringGuide" style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; background: #f9f9f9;">
+      <h3 style="margin: 0 0 8px 0; font-size: 18px; text-align: center;">Scoring Guide</h3>
+      <ul style="margin: 0; padding-left: 20px; line-height: 1.4;">
+        <li><strong>Multiple Choice:</strong> 50 points</li>
+        <li><strong>Fill‑in‑the‑Blank:</strong> 75 points</li>
+        <li><strong>Scrambled:</strong> 50 points + 10x time Bonus!</li>
+        <li><strong>Use Talents to answer what others couldn't:</strong> 25 points</li>
+        <li><strong>Speed Bonus:</strong> +1 point per second left</li>
+        <li><strong>Incorrect Answer or Time‑Out:</strong> 0 points</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ========================================================= -->
+<!--  SCREEN 2: SINGLE PLAYER OPTIONS                          -->
+<!-- ========================================================= -->
+<div id="screenSingleOptions" style="display:none;">
+  <h2>Single Player Options</h2>
+
+  <label>Player Name:</label>
+  <input type="text" id="singlePlayerName" placeholder="Enter your name"><br>
+
+  <label>Number of Rounds 1-20:</label><br>
+  <input type="range" id="singlePlayerRoundsInput" value="3" min="1" max="20" step="1"
+         oninput="singlePlayerRoundsOutput.value = this.value">
+  <output id="singlePlayerRoundsOutput">3</output><br>
+
+  <label>Quiz Type:</label>
+  <select id="singlePlayerQuizType">
+    <option value="multiple">Guess the Book</option>
+    <option value="fill">Fill in the Blank</option>
+    <option value="scramble">Scrambled Verse</option>
+    <option value="mixed" selected>Mixed</option>
+  </select><br>
+
+  <label>Testament:</label>
+  <select id="singlePlayerTestament">
+    <option value="both">Both</option>
+    <option value="ot">Old Testament</option>
+    <option value="nt">New Testament</option>
+  </select><br>
+
+  <label><input type="checkbox" id="singlePlayerTimerToggle"> Enable Timer</label><br>
+  <label><input type="checkbox" id="singlePlayerTimeBonus"> Enable Time Bonus Scoring</label><br>
+
+  <label>Time per Question:</label>
+  <select id="singlePlayerTimerLength">
+    <option value="10">10 seconds</option>
+    <option value="20">20 seconds</option>
+    <option value="30" selected>30 seconds</option>
+  </select><br><br>
+
+  <button onclick="saveSinglePlayerOptions()">Save</button>
+  <button onclick="startSinglePlayerGame()">Start Game</button>
+  <button onclick="backToMenu()">Back</button>
+</div>
+
+
+<!-- ========================================================= -->
+<!--  SCREEN 3: MULTIPLAYER OPTIONS                            -->
+<!-- ========================================================= -->
+<div id="screenMultiOptions" style="display:none;">
+  <h2>Multiplayer Options</h2>
+
+  <label>Number of Rounds 1-20:</label><br>
+  <input type="range" id="roundsInput" value="3" min="1" max="20" step="1"
+         oninput="roundsOutput.value = this.value">
+  <output id="roundsOutput">3</output><br>
+
+  <label>Number of Players 1-10:</label><br>
+  <input type="range" id="playersInput" value="1" min="1" max="10" step="1"
+         oninput="playersOutput.value = this.value; renderPlayerInputs()">
+  <output id="playersOutput">1</output><br>
+
+  <div id="playerNames"></div>
+
+  <label>Starting Talents:</label><br>
+  <input type="range" id="talentsInput" value="2" min="0" max="10" step="1"
+         oninput="talentsOutput.value = this.value">
+  <output id="talentsOutput">2</output><br>
+
+  <label>Testament:</label>
+  <select id="testamentSelect">
+    <option value="ot">Old Testament</option>
+    <option value="nt">New Testament</option>
+    <option value="both" selected>Both</option>
+  </select><br>
+
+  <label>Quiz Type:</label>
+  <select id="quizType">
+    <option value="multiple">Guess the Book</option>
+    <option value="fill">Fill in the Blank</option>
+    <option value="scramble">Scrambled Verse</option>
+    <option value="mixed" selected>Mixed</option>
+  </select><br>
+
+  <label><input type="checkbox" id="timerEnabled"> Enable Timer</label><br>
+  <label><input type="checkbox" id="timeBonusCheckbox" checked> Enable Time Bonus Scoring</label><br>
+
+  <label>Time per Question:</label>
+  <select id="timerInput">
+    <option value="10">10 seconds</option>
+    <option value="20">20 seconds</option>
+    <option value="30" selected>30 seconds</option>
+  </select><br><br>
+
+  <button onclick="startLocalMultiplayerGame()">Start Game</button>
+  <button onclick="saveOptions()">Save</button>
+  <button onclick="resetDefaults()">Reset to Default Settings</button>
+  <button onclick="backToMenu()">Back</button>
+</div>
+
+
+<!-- ========================================================= -->
+<!--  SCREEN 4: QUIZ SCREEN                                    -->
+<!-- ========================================================= -->
+<div id="screenQuiz" style="display:none;">
+  <div id="quizArea">
+    <div id="progress"></div>
+    <div id="turn"></div>
+    <div id="quiz"></div>
+    <div id="result"></div>
+    <div id="controls"></div>
+  </div>
+</div>
+
+
+<!-- Redemption Overlay -->
+<div id="redeemOverlay" class="redeem-overlay" style="display:none;">
+  <div class="redeem-box" id="redeemBox"></div>
+</div>
+
+<!-- Fade Overlay -->
+<div id="fadeOverlay" style="
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: black; opacity: 0;
+  pointer-events: none; transition: opacity 1s ease;
+  z-index: 9999;
+"></div>
+
+<script src="quiz.js"></script>
+</body>
+</html>
