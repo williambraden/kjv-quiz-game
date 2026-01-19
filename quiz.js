@@ -656,9 +656,7 @@ function renderScrambledVerse(verseText) {
 
     currentScrambleAnswer = scrambleWords;
 
-    // ⭐ FIX: show screen BEFORE rendering
     showScreen("screenQuiz");
-
     renderScrambleUI(verseText, scrambleWords);
 }
 
@@ -678,11 +676,9 @@ function renderScrambleUI(verseText, scrambleWords) {
 
     const dropHTML = `<div id="scrambleDrop" class="drop-container"></div>`;
 
-    // ⭐ FIX: clear result + controls so old UI doesn't interfere
     document.getElementById("result").innerHTML = "";
     document.getElementById("controls").innerHTML = "";
 
-    // Render into the correct container
     document.getElementById("quiz").innerHTML = `
         <p><strong>${verseText}</strong></p>
         <p>Reconstruct the first ${scrambleWords.length} words of the verse:</p>
@@ -691,7 +687,6 @@ function renderScrambleUI(verseText, scrambleWords) {
         <button id="submitBtn">Submit</button>
     `;
 
-    // ⭐ FIX: attach listener AFTER render
     document.getElementById("submitBtn").onclick = submitScrambledVerse;
 
     setupScrambleDragDrop();
@@ -703,33 +698,27 @@ function setupScrambleDragDrop() {
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
 
-    // --- Helper: update correctness feedback ---
- function updateScrambleFeedback() {
-    const placedTiles = Array.from(dropZone.querySelectorAll(".tile"));
+    function updateScrambleFeedback() {
+        const placedTiles = Array.from(dropZone.querySelectorAll(".tile"));
 
-    // ⭐ Always remove placed so red/green can show
-    placedTiles.forEach(tile => tile.classList.remove("placed"));
+        placedTiles.forEach((tile, index) => {
+            const word = tile.dataset.word;
+            const correctWord = currentScrambleAnswer[index];
 
-    placedTiles.forEach((tile, index) => {
-        const word = tile.dataset.word;
-        const correctWord = currentScrambleAnswer[index];
+            if (word === correctWord) {
+                tile.classList.add("correct-word");
+                tile.classList.remove("incorrect-word");
+            } else {
+                tile.classList.add("incorrect-word");
+                tile.classList.remove("correct-word");
+            }
+        });
 
-        if (word === correctWord) {
-            tile.classList.add("correct-word");
-            tile.classList.remove("incorrect-word");
-        } else {
-            tile.classList.add("incorrect-word");
-            tile.classList.remove("correct-word");
-        }
-    });
+        tileContainer.querySelectorAll(".tile").forEach(tile => {
+            tile.classList.remove("correct-word", "incorrect-word");
+        });
+    }
 
-    // Tiles in the container never show correctness
-    tileContainer.querySelectorAll(".tile").forEach(tile => {
-        tile.classList.remove("correct-word", "incorrect-word");
-    });
-}
-
-    // --- DRAG START: store the tile being dragged ---
     tiles.forEach(tile => {
         tile.addEventListener("touchstart", handleTouchStart, { passive: false });
         tile.addEventListener("touchmove", handleTouchMove, { passive: false });
@@ -744,61 +733,66 @@ function setupScrambleDragDrop() {
 
         tile.addEventListener("dragend", e => {
             tile.classList.remove("dragging");
+            currentlyDraggingTile = null;
         });
 
-        // ⭐ Double‑click to move tile
         tile.addEventListener("dblclick", () => {
             if (tile.parentElement === tileContainer) {
                 dropZone.appendChild(tile);
-                tile.classList.add("placed");
             } else {
                 tileContainer.appendChild(tile);
-                tile.classList.remove("placed");
                 tile.classList.remove("correct-word", "incorrect-word");
             }
-
             updateScrambleFeedback();
         });
     });
 
-
-    // --- REORDERING INSIDE DROP ZONE ---
+    // ⭐⭐⭐ PATCHED DESKTOP DRAGOVER — supports dragging to the END
     dropZone.addEventListener("dragover", e => {
         e.preventDefault();
+        if (!currentlyDraggingTile) return;
 
-        const afterElement = getDragAfterElement(dropZone, e.clientX);
+        const afterElement = getDragAfterElement(dropZone, e.clientX, e.clientY);
+
+        // ⭐ FIX: detect if cursor is past the last tile → append
+        const lastTile = dropZone.lastElementChild;
+        if (lastTile) {
+            const rect = lastTile.getBoundingClientRect();
+            if (e.clientX > rect.right) {
+                dropZone.appendChild(currentlyDraggingTile);
+                updateScrambleFeedback();
+                return;
+            }
+        }
+
         if (afterElement == null) {
             dropZone.appendChild(currentlyDraggingTile);
         } else {
             dropZone.insertBefore(currentlyDraggingTile, afterElement);
         }
 
-        currentlyDraggingTile.classList.add("placed");
-        currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
-
         updateScrambleFeedback();
     });
+    // ⭐⭐⭐ END PATCH
 
-
-    // --- MOVE INTO DROP ZONE ---
     dropZone.addEventListener("drop", e => {
         e.preventDefault();
         updateScrambleFeedback();
     });
 
-
-    // --- MOVE BACK TO TILE CONTAINER ---
     tileContainer.addEventListener("dragover", e => e.preventDefault());
 
     tileContainer.addEventListener("drop", e => {
         e.preventDefault();
+        if (!currentlyDraggingTile) return;
         tileContainer.appendChild(currentlyDraggingTile);
-        currentlyDraggingTile.classList.remove("placed");
         currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
-
         updateScrambleFeedback();
     });
+
+    window._scrambleUpdateFeedback = updateScrambleFeedback;
 }
+
 
 
 let touchClone = null;
@@ -818,7 +812,6 @@ function handleTouchStart(e) {
     touchOffsetX = touch.clientX - rect.left;
     touchOffsetY = touch.clientY - rect.top;
 
-    // Create a floating clone to follow the finger
     touchClone = tile.cloneNode(true);
     touchClone.style.position = "fixed";
     touchClone.style.left = rect.left + "px";
@@ -833,11 +826,10 @@ function handleTouchStart(e) {
 
 function handleTouchMove(e) {
     e.preventDefault();
-    if (!touchClone) return;
+    if (!touchClone || !currentlyDraggingTile) return;
 
     const touch = e.touches[0];
 
-    // Move the floating clone
     touchClone.style.left = (touch.clientX - touchOffsetX) + "px";
     touchClone.style.top = (touch.clientY - touchOffsetY) + "px";
 
@@ -854,16 +846,12 @@ function handleTouchMove(e) {
         } else {
             dropZone.insertBefore(currentlyDraggingTile, afterElement);
         }
-
-        // ⭐ iPhone fix: remove placed immediately
-        currentlyDraggingTile.classList.remove("placed");
-    }
-    else if (tileContainer.contains(target)) {
+    } else if (tileContainer.contains(target)) {
         tileContainer.appendChild(currentlyDraggingTile);
-        currentlyDraggingTile.classList.remove("placed");
+        currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
     }
-	updateScrambleFeedback();
 
+    if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
 }
 
 function handleTouchEnd(e) {
@@ -874,10 +862,8 @@ function handleTouchEnd(e) {
     }
     if (currentlyDraggingTile) {
         currentlyDraggingTile.classList.remove("dragging");
-        currentlyDraggingTile.classList.remove("placed"); // ⭐ iPhone fix
     }
-	updateScrambleFeedback();
-
+    if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
 }
 
 
