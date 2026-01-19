@@ -707,7 +707,7 @@ function setupScrambleDragDrop() {
  function updateScrambleFeedback() {
     const placedTiles = Array.from(dropZone.querySelectorAll(".tile"));
 
-    // ⭐ FIX: remove placed so red/green can show
+    // ⭐ Always remove placed so red/green can show
     placedTiles.forEach(tile => tile.classList.remove("placed"));
 
     placedTiles.forEach((tile, index) => {
@@ -723,8 +723,8 @@ function setupScrambleDragDrop() {
         }
     });
 
-    const containerTiles = tileContainer.querySelectorAll(".tile");
-    containerTiles.forEach(tile => {
+    // Tiles in the container never show correctness
+    tileContainer.querySelectorAll(".tile").forEach(tile => {
         tile.classList.remove("correct-word", "incorrect-word");
     });
 }
@@ -841,20 +841,22 @@ function handleTouchMove(e) {
     touchClone.style.left = (touch.clientX - touchOffsetX) + "px";
     touchClone.style.top = (touch.clientY - touchOffsetY) + "px";
 
-    // Reuse your existing reorder logic
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
 
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
 
     if (dropZone.contains(target)) {
-        const afterElement = getDragAfterElement(dropZone, touch.clientX);
+        const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
+
         if (afterElement == null) {
             dropZone.appendChild(currentlyDraggingTile);
         } else {
             dropZone.insertBefore(currentlyDraggingTile, afterElement);
         }
-        currentlyDraggingTile.classList.add("placed");
+
+        // ⭐ iPhone fix: remove placed immediately
+        currentlyDraggingTile.classList.remove("placed");
     }
     else if (tileContainer.contains(target)) {
         tileContainer.appendChild(currentlyDraggingTile);
@@ -876,15 +878,26 @@ function handleTouchEnd(e) {
 
 
 
-function getDragAfterElement(container, mouseX) {
+function getDragAfterElement(container, x, y) {
     const elements = [...container.querySelectorAll(".tile:not(.dragging)")];
 
-    return elements.find(el => {
-        const rect = el.getBoundingClientRect();
-        return mouseX < rect.left + rect.width / 2;
-    });
-}
+    let closest = null;
+    let closestDist = Number.POSITIVE_INFINITY;
 
+    elements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const dx = x - (rect.left + rect.width / 2);
+        const dy = y - (rect.top + rect.height / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < closestDist) {
+            closestDist = dist;
+            closest = el;
+        }
+    });
+
+    return closest;
+}
 
 
 function renderMultipleChoice(verseText, correctBook) {
