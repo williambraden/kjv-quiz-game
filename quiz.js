@@ -598,55 +598,42 @@ async function runQuiz() {
 }
 
 function renderScrambledVerse(verseText) {
-    // Tuning knobs
     const MIN_WORDS = 6;
-    const HARD_MAX_WORDS = 12;   // absolute ceiling
-    const SOFT_MAX_WORDS = 10;   // default max; 11–12 only if completes a clause
+    const HARD_MAX_WORDS = 12;
+    const SOFT_MAX_WORDS = 10;
 
-    // 1. Split original verse into tokens so we can see punctuation
     const tokens = verseText.split(/\s+/);
 
-    // 2. Build cleaned words list (for tiles / answer)
     const cleanWords = tokens
-        .map(t => t.replace(/[^\w\s]/g, "")) // strip punctuation
+        .map(t => t.replace(/[^\w\s]/g, ""))
         .filter(w => w.length > 0);
 
-    // 3. Handle very short verses: scramble everything
     if (cleanWords.length <= MIN_WORDS) {
         currentScrambleAnswer = cleanWords;
+        showScreen("screenQuiz");
         renderScrambleUI(verseText, cleanWords);
         return;
     }
 
-    // 4. Find clause boundaries in ORIGINAL tokens (where tokens end with punctuation)
     const punctuationRegex = /[.,;:?!]$/;
     let clauseBoundaries = [];
 
     tokens.forEach((token, index) => {
-        if (punctuationRegex.test(token)) {
-            clauseBoundaries.push(index);
-        }
+        if (punctuationRegex.test(token)) clauseBoundaries.push(index);
     });
 
-    // If no punctuation, treat the entire verse as a single clause
     if (clauseBoundaries.length === 0) {
         clauseBoundaries = [tokens.length - 1];
     }
 
-    // 5. Start with the first clause: from token index 0 to first boundary
     let scrambleStartTokenIndex = 0;
-    let scrambleEndTokenIndex = clauseBoundaries[0]; // inclusive
+    let scrambleEndTokenIndex = clauseBoundaries[0];
 
-    // Map token span -> cleaned word span
-    // (Assuming token count and cleanWords count stay aligned positionally enough
-    //  for scrambled chunk, because we strip only punctuation.)
-    let scrambleWords = cleanWords.slice(scrambleStartTokenIndex, scrambleEndTokenIndex + 1);
+    let scrambleWords = cleanWords.slice(
+        scrambleStartTokenIndex,
+        scrambleEndTokenIndex + 1
+    );
 
-    // 6. If first clause is under MIN_WORDS, extend into subsequent clauses
-    //    until BOTH:
-    //      - we reach at least MIN_WORDS
-    //      - AND we hit the next punctuation boundary
-    //    OR we hit HARD_MAX_WORDS
     let boundaryIndex = 0;
     while (
         scrambleWords.length < MIN_WORDS &&
@@ -655,38 +642,31 @@ function renderScrambledVerse(verseText) {
     ) {
         boundaryIndex++;
         scrambleEndTokenIndex = clauseBoundaries[boundaryIndex];
-        scrambleWords = cleanWords.slice(scrambleStartTokenIndex, scrambleEndTokenIndex + 1);
+        scrambleWords = cleanWords.slice(
+            scrambleStartTokenIndex,
+            scrambleEndTokenIndex + 1
+        );
     }
 
-    // 7. Now enforce the “10 by default, up to 12 only if boundary is at 11–12” rule
-
-    // At this point, scrambleWords ends at a clause boundary (punctuation),
-    // OR at the end of the verse, OR we hit HARD_MAX_WORDS.
-
     if (scrambleWords.length > SOFT_MAX_WORDS) {
-        if (scrambleWords.length <= HARD_MAX_WORDS) {
-            // Length is 11 or 12 and ends at a clause boundary → allowed
-            // Do nothing; keep it as-is
-        } else {
-            // Clause is longer than 12 → we trim to 10 (SOFT_MAX_WORDS)
+        if (scrambleWords.length > HARD_MAX_WORDS) {
             scrambleWords = scrambleWords.slice(0, SOFT_MAX_WORDS);
         }
     }
 
-    // 8. Store correct answer for checking later
     currentScrambleAnswer = scrambleWords;
 
-    // 9. Render UI
+    // ⭐ FIX: show screen BEFORE rendering
+    showScreen("screenQuiz");
+
     renderScrambleUI(verseText, scrambleWords);
 }
 
 
 // Helper: builds tiles & drop zone, wires drag/drop
 function renderScrambleUI(verseText, scrambleWords) {
-    // Shuffle the selected words
     const scrambled = [...scrambleWords].sort(() => Math.random() - 0.5);
 
-    // Tiles
     let tilesHTML = `<div id="scrambleTiles" class="tile-container">`;
     scrambled.forEach((word, i) => {
         tilesHTML += `
@@ -696,17 +676,23 @@ function renderScrambleUI(verseText, scrambleWords) {
     });
     tilesHTML += `</div>`;
 
-    // Drop zone
     const dropHTML = `<div id="scrambleDrop" class="drop-container"></div>`;
 
-    // Render
+    // ⭐ FIX: clear result + controls so old UI doesn't interfere
+    document.getElementById("result").innerHTML = "";
+    document.getElementById("controls").innerHTML = "";
+
+    // Render into the correct container
     document.getElementById("quiz").innerHTML = `
         <p><strong>${verseText}</strong></p>
         <p>Reconstruct the first ${scrambleWords.length} words of the verse:</p>
         ${tilesHTML}
         ${dropHTML}
-        <button id="submitBtn" onclick="submitScrambledVerse()">Submit</button>
+        <button id="submitBtn">Submit</button>
     `;
+
+    // ⭐ FIX: attach listener AFTER render
+    document.getElementById("submitBtn").onclick = submitScrambledVerse;
 
     setupScrambleDragDrop();
 }
@@ -718,29 +704,30 @@ function setupScrambleDragDrop() {
     const tileContainer = document.getElementById("scrambleTiles");
 
     // --- Helper: update correctness feedback ---
-    function updateScrambleFeedback() {
-        const placedTiles = Array.from(dropZone.querySelectorAll(".tile"));
+ function updateScrambleFeedback() {
+    const placedTiles = Array.from(dropZone.querySelectorAll(".tile"));
 
-        placedTiles.forEach((tile, index) => {
-            const word = tile.dataset.word;
-            const correctWord = currentScrambleAnswer[index];
+    // ⭐ FIX: remove placed so red/green can show
+    placedTiles.forEach(tile => tile.classList.remove("placed"));
 
-            if (word === correctWord) {
-                tile.classList.add("correct-word");
-                tile.classList.remove("incorrect-word");
-            } else {
-                tile.classList.add("incorrect-word");
-                tile.classList.remove("correct-word");
-            }
-        });
+    placedTiles.forEach((tile, index) => {
+        const word = tile.dataset.word;
+        const correctWord = currentScrambleAnswer[index];
 
-        // Tiles in the container should never show correctness
-        const containerTiles = tileContainer.querySelectorAll(".tile");
-        containerTiles.forEach(tile => {
-            tile.classList.remove("correct-word", "incorrect-word");
-        });
-    }
+        if (word === correctWord) {
+            tile.classList.add("correct-word");
+            tile.classList.remove("incorrect-word");
+        } else {
+            tile.classList.add("incorrect-word");
+            tile.classList.remove("correct-word");
+        }
+    });
 
+    const containerTiles = tileContainer.querySelectorAll(".tile");
+    containerTiles.forEach(tile => {
+        tile.classList.remove("correct-word", "incorrect-word");
+    });
+}
 
     // --- DRAG START: store the tile being dragged ---
     tiles.forEach(tile => {
@@ -1164,7 +1151,8 @@ function handleCorrectAnswer(basePoints, timeLeft = 0, isScramble = false) {
         `<button onclick="runQuiz()">Next Question</button>`;
 }
 
-function handleIncorrectAnswer(correctText) {
+function handleIncorrectAnswer(correctText, skipRedemption = false)
+ {
     if (gameMode === "single") {
         currentPlayer.incorrect++;
     } else {
@@ -1179,20 +1167,16 @@ function handleIncorrectAnswer(correctText) {
     disableAllAnswerUI();
 
     // MULTIPLAYER: begin redemption sequence
-    if (gameMode !== "single") {
-
-        // Reset redemption tracking for this question
-        redemptionAttempted.clear();
-
-        // Find the first eligible redeemer (starting AFTER the turn owner)
-        const next = getNextPlayerForRedemption();
-
-        if (next !== null) {
-            currentPlayerIndex = next;
-            offerRedeemTime();
-            return;
-        }
+    if (!skipRedemption && gameMode !== "single") {
+    redemptionAttempted.clear();
+    const next = getNextPlayerForRedemption();
+    if (next !== null) {
+        currentPlayerIndex = next;
+        offerRedeemTime();
+        return;
     }
+}
+
 
     // No redemption possible → show final incorrect result
     document.getElementById("result").innerHTML =
@@ -1268,6 +1252,12 @@ function submitScrambledVerse() {
     const dropZone = document.getElementById("scrambleDrop");
     const tiles = [...dropZone.querySelectorAll(".tile")];
 
+	// Always clear previous highlighting
+	document.querySelectorAll(".tile").forEach(tile => {
+		tile.classList.remove("correct-word", "incorrect-word");
+	});
+
+
     if (tiles.length !== currentScrambleAnswer.length) {
         document.getElementById("result").innerHTML =
             `Place all the words before submitting.`;
@@ -1299,20 +1289,12 @@ function submitScrambledVerse() {
     const timeBonus = timerEnabled ? Math.floor(timeLeft) : 0;
 
     if (isCorrect) {
-    if (redemptionActive) {
-        handleSuccessfulRedemption();
-    } else {
         handleCorrectAnswer(75, timeBonus, true);
-    }
-} else {
-    if (redemptionActive) {
-        handleFailedRedemption();
     } else {
+        // ⭐ NO REDEMPTION IN SCRAMBLED MODE
         const correctText = `The correct verse was:<br>"${currentVerse.text}"`;
-        handleIncorrectAnswer(correctText);
+        handleIncorrectAnswer(correctText, /*skipRedemption=*/true);
     }
-}
-
 }
 
 function disableAllAnswerUI() {
@@ -2092,4 +2074,3 @@ function fadeToBlack(callback) {
 });
 
 	
-
