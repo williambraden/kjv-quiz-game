@@ -66,14 +66,66 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
   .podiumContent p { font-size: 0.85em !important; line-height: 1.2em; }
 }
 
+
+
 /* Scramble tiles */
-.tile-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.tile { padding: 8px 12px; white-space: normal; background: #eee; border: 1px solid #ccc; border-radius: 6px; cursor: grab; user-select: none; }
-.drop-container { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 12px; min-height: 80px; border: 2px dashed #888; border-radius: 6px; background: #fafafa; width: 100%; box-sizing: border-box; }
-.tile.placed { background: #d9f7d9; border-color: #8bc98b; cursor: default; }
-.tile.dragging { opacity: 0.3; }
-.correct-word { background-color: #4caf50; color: white; }
-.incorrect-word { background-color: #f44336; color: white; }
+.tile-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.tile {
+    padding: 8px 12px;
+    white-space: normal;
+    background: #eee;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    cursor: grab;
+    user-select: none;
+    touch-action: none; /* iPhone drag fix */
+}
+
+/* Drop zone */
+.drop-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+    min-height: 80px;
+    border: 2px dashed #888;
+    border-radius: 6px;
+    background: #fafafa;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Dragging visual */
+.tile.dragging {
+    opacity: 0.3;
+}
+
+/* Correctness colors — FIXED SPECIFICITY */
+.tile.correct-word {
+    background-color: #4caf50 !important;
+    color: white !important;
+}
+
+.tile.incorrect-word {
+    background-color: #f44336 !important;
+    color: white !important;
+}
+
+/* Remove placed styling — no longer used */
+.tile.placed {
+    background: #d9f7d9;
+    border-color: #8bc98b;
+    cursor: default;
+}
+
+
 
 /* Redemption overlay */
 .redeem-overlay {
@@ -266,4 +318,3 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
 <script src="quiz.js"></script>
 </body>
 </html>
-

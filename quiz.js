@@ -834,17 +834,26 @@ function handleTouchMove(e) {
 
     const touch = e.touches[0];
 
+    // Move the floating clone
     touchClone.style.left = (touch.clientX - touchOffsetX) + "px";
     touchClone.style.top = (touch.clientY - touchOffsetY) + "px";
 
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
 
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    // ⭐ iPhone‑safe: determine if finger is visually inside drop zone
+    const dzRect = dropZone.getBoundingClientRect();
+    const insideDropZone =
+        touch.clientX >= dzRect.left &&
+        touch.clientX <= dzRect.right &&
+        touch.clientY >= dzRect.top &&
+        touch.clientY <= dzRect.bottom;
 
-    if (dropZone.contains(target)) {
+    if (insideDropZone) {
+        // Find nearest tile for 2D reordering
         const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
 
+        // ⭐ Drag‑to‑end fix for iPhone
         const lastTile = dropZone.lastElementChild;
         if (lastTile) {
             const rect = lastTile.getBoundingClientRect();
@@ -855,16 +864,20 @@ function handleTouchMove(e) {
             }
         }
 
+        // Insert before nearest tile or append
         if (afterElement == null) {
             dropZone.appendChild(currentlyDraggingTile);
         } else {
             dropZone.insertBefore(currentlyDraggingTile, afterElement);
         }
-    } else if (tileContainer.contains(target)) {
+    }
+    else {
+        // Back to tile container
         tileContainer.appendChild(currentlyDraggingTile);
         currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
     }
 
+    // Live red/green update while dragging
     if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
 }
 
