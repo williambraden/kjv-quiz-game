@@ -1702,7 +1702,7 @@ function showRedeemPrompt(player) {
     const box = document.getElementById("redeemBox");
 
     box.innerHTML = `
-        <p><strong>${player.name}</strong>, Redeem the Time?</p>
+        <p><strong>${player.name}</strong>, Spend a Talent to Redeem the Time?</p>
         <button onclick="acceptRedeemTime()">Accept</button>
         <button onclick="passRedeemTime()">Pass</button>
     `;
@@ -2092,3 +2092,4 @@ function fadeToBlack(callback) {
 });
 
 	
+
