@@ -73,7 +73,6 @@ let redemptionTimer = null;
 let redemptionTimeLeft = 0;   // if you use this
 
 
-let currentlyDraggingTile = null;
 let scrambledAlreadyChecked = false;
 let currentVerseWords = [];
 
@@ -597,6 +596,12 @@ async function runQuiz() {
     }
 }
 
+// Globals
+let currentlyDraggingTile = null;
+let touchClone = null;
+let touchOffsetX = 0;
+let touchOffsetY = 0;
+
 function renderScrambledVerse(verseText) {
     const MIN_WORDS = 6;
     const HARD_MAX_WORDS = 12;
@@ -720,10 +725,12 @@ function setupScrambleDragDrop() {
     }
 
     tiles.forEach(tile => {
+        // Touch
         tile.addEventListener("touchstart", handleTouchStart, { passive: false });
         tile.addEventListener("touchmove", handleTouchMove, { passive: false });
         tile.addEventListener("touchend", handleTouchEnd, { passive: false });
 
+        // Desktop drag
         tile.addEventListener("dragstart", e => {
             currentlyDraggingTile = tile;
             tile.classList.add("dragging");
@@ -733,9 +740,10 @@ function setupScrambleDragDrop() {
 
         tile.addEventListener("dragend", e => {
             tile.classList.remove("dragging");
-            currentlyDraggingTile = null;
+            // currentlyDraggingTile cleared in drop handlers
         });
 
+        // Double‑click toggle
         tile.addEventListener("dblclick", () => {
             if (tile.parentElement === tileContainer) {
                 dropZone.appendChild(tile);
@@ -747,14 +755,13 @@ function setupScrambleDragDrop() {
         });
     });
 
-    // ⭐⭐⭐ PATCHED DESKTOP DRAGOVER — supports dragging to the END
+    // Desktop drag over drop zone
     dropZone.addEventListener("dragover", e => {
         e.preventDefault();
         if (!currentlyDraggingTile) return;
 
         const afterElement = getDragAfterElement(dropZone, e.clientX, e.clientY);
 
-        // ⭐ FIX: detect if cursor is past the last tile → append
         const lastTile = dropZone.lastElementChild;
         if (lastTile) {
             const rect = lastTile.getBoundingClientRect();
@@ -773,10 +780,10 @@ function setupScrambleDragDrop() {
 
         updateScrambleFeedback();
     });
-    // ⭐⭐⭐ END PATCH
 
     dropZone.addEventListener("drop", e => {
         e.preventDefault();
+        currentlyDraggingTile = null;
         updateScrambleFeedback();
     });
 
@@ -787,6 +794,7 @@ function setupScrambleDragDrop() {
         if (!currentlyDraggingTile) return;
         tileContainer.appendChild(currentlyDraggingTile);
         currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
+        currentlyDraggingTile = null;
         updateScrambleFeedback();
     });
 
@@ -794,10 +802,6 @@ function setupScrambleDragDrop() {
 }
 
 
-
-let touchClone = null;
-let touchOffsetX = 0;
-let touchOffsetY = 0;
 
 function handleTouchStart(e) {
     e.preventDefault();
@@ -841,6 +845,16 @@ function handleTouchMove(e) {
     if (dropZone.contains(target)) {
         const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
 
+        const lastTile = dropZone.lastElementChild;
+        if (lastTile) {
+            const rect = lastTile.getBoundingClientRect();
+            if (touch.clientX > rect.right) {
+                dropZone.appendChild(currentlyDraggingTile);
+                if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
+                return;
+            }
+        }
+
         if (afterElement == null) {
             dropZone.appendChild(currentlyDraggingTile);
         } else {
@@ -863,8 +877,12 @@ function handleTouchEnd(e) {
     if (currentlyDraggingTile) {
         currentlyDraggingTile.classList.remove("dragging");
     }
+    currentlyDraggingTile = null;
     if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
 }
+
+// Safety for iOS touch cancel
+window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 
 
 
