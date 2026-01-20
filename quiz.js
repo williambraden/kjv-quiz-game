@@ -930,16 +930,15 @@ function getDragAfterElement(container, x, y) {
     const tiles = [...container.querySelectorAll(".tile:not(.dragging)")];
     if (tiles.length === 0) return null;
 
-    // Group tiles into rows based on their top position
+    // Group tiles into rows based on vertical proximity
     const rows = [];
     tiles.forEach(tile => {
         const rect = tile.getBoundingClientRect();
-        const top = rect.top;
+        const midY = rect.top + rect.height / 2;
 
-        // Find an existing row within a small vertical threshold
-        let row = rows.find(r => Math.abs(r.top - top) < 10);
+        let row = rows.find(r => Math.abs(r.midY - midY) < 10);
         if (!row) {
-            row = { top, tiles: [] };
+            row = { midY, tiles: [] };
             rows.push(row);
         }
         row.tiles.push(tile);
@@ -947,17 +946,17 @@ function getDragAfterElement(container, x, y) {
 
     // Determine which row the finger is closest to
     let targetRow = rows[0];
-    let minRowDist = Infinity;
+    let minDist = Infinity;
 
     rows.forEach(row => {
-        const dist = Math.abs(y - row.top);
-        if (dist < minRowDist) {
-            minRowDist = dist;
+        const dist = Math.abs(y - row.midY);
+        if (dist < minDist) {
+            minDist = dist;
             targetRow = row;
         }
     });
 
-    // Now find the nearest tile horizontally within that row
+    // Now find nearest tile horizontally within that row
     let closest = null;
     let closestDist = Infinity;
 
