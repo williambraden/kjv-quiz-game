@@ -843,11 +843,11 @@ function handleTouchMove(e) {
 
     // Determine if finger is visually inside drop zone
     const dzRect = dropZone.getBoundingClientRect();
-    const insideDropZone =
-        touch.clientX >= dzRect.left &&
-        touch.clientX <= dzRect.right &&
-        touch.clientY >= dzRect.top &&
-        touch.clientY <= dzRect.bottom;
+    // iPhone‑safe: horizontal-only detection
+	const insideDropZone =
+		touch.clientX >= dzRect.left &&
+		touch.clientX <= dzRect.right;
+
 
     if (insideDropZone) {
 
