@@ -834,73 +834,29 @@ function handleTouchMove(e) {
 
     const touch = e.touches[0];
 
-    // Move the floating clone
+    // Move clone
     touchClone.style.left = (touch.clientX - touchOffsetX) + "px";
     touchClone.style.top = (touch.clientY - touchOffsetY) + "px";
 
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
 
-    // Determine if finger is visually inside drop zone
     const dzRect = dropZone.getBoundingClientRect();
-    // iPhone‑safe: horizontal-only detection
-	const insideDropZone =
-		touch.clientX >= dzRect.left &&
-		touch.clientX <= dzRect.right;
 
+    // Horizontal-only detection (iPhone-safe)
+    const insideDropZone =
+        touch.clientX >= dzRect.left &&
+        touch.clientX <= dzRect.right;
 
     if (insideDropZone) {
-
-        // ⭐ Build row groups (same logic as getDragAfterElement)
-        const tiles = [...dropZone.querySelectorAll(".tile:not(.dragging)")];
-        const rows = [];
-        tiles.forEach(tile => {
-            const rect = tile.getBoundingClientRect();
-            let row = rows.find(r => Math.abs(r.top - rect.top) < 10);
-            if (!row) {
-                row = { top: rect.top, tiles: [] };
-                rows.push(row);
-            }
-            row.tiles.push(tile);
-        });
-
-        // Find the row closest to the finger
-        let targetRow = rows[0];
-        let minDist = Infinity;
-        rows.forEach(row => {
-            const dist = Math.abs(touch.clientY - row.top);
-            if (dist < minDist) {
-                minDist = dist;
-                targetRow = row;
-            }
-        });
-
-        // ⭐ Find last tile in that row
-        const rowTiles = targetRow.tiles;
-        const lastTile = rowTiles[rowTiles.length - 1];
-
-        // ⭐ iPhone‑safe drag‑to‑end logic for the active row
-        if (lastTile) {
-            const rect = lastTile.getBoundingClientRect();
-            const lastCenter = rect.left + rect.width / 2;
-
-            if (touch.clientX > lastCenter) {
-                dropZone.appendChild(currentlyDraggingTile);
-                if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
-                return;
-            }
-        }
-
-        // ⭐ Insert before nearest tile in the active row
         const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
+
         if (afterElement == null) {
             dropZone.appendChild(currentlyDraggingTile);
         } else {
             dropZone.insertBefore(currentlyDraggingTile, afterElement);
         }
-    }
-    else {
-        // Back to tile container
+    } else {
         tileContainer.appendChild(currentlyDraggingTile);
         currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
     }
@@ -925,18 +881,17 @@ function handleTouchEnd(e) {
 window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 
 
-
 function getDragAfterElement(container, x, y) {
     const tiles = [...container.querySelectorAll(".tile:not(.dragging)")];
     if (tiles.length === 0) return null;
 
-    // Group tiles into rows based on vertical proximity
+    // Group tiles into rows based on midpoint Y
     const rows = [];
     tiles.forEach(tile => {
         const rect = tile.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
 
-        let row = rows.find(r => Math.abs(r.midY - midY) < 10);
+        let row = rows.find(r => Math.abs(r.midY - midY) < 12);
         if (!row) {
             row = { midY, tiles: [] };
             rows.push(row);
@@ -944,10 +899,9 @@ function getDragAfterElement(container, x, y) {
         row.tiles.push(tile);
     });
 
-    // Determine which row the finger is closest to
+    // Pick the row closest to the finger
     let targetRow = rows[0];
     let minDist = Infinity;
-
     rows.forEach(row => {
         const dist = Math.abs(y - row.midY);
         if (dist < minDist) {
@@ -956,23 +910,22 @@ function getDragAfterElement(container, x, y) {
         }
     });
 
-    // Now find nearest tile horizontally within that row
-    let closest = null;
-    let closestDist = Infinity;
-
-    targetRow.tiles.forEach(tile => {
-        const rect = tile.getBoundingClientRect();
-        const tileCenterX = rect.left + rect.width / 2;
-        const dx = x - tileCenterX;
-        const dist = Math.abs(dx);
-
-        if (dist < closestDist) {
-            closestDist = dist;
-            closest = tile;
-        }
+    // Sort tiles in that row by X
+    targetRow.tiles.sort((a, b) => {
+        const ax = a.getBoundingClientRect().left;
+        const bx = b.getBoundingClientRect().left;
+        return ax - bx;
     });
 
-    return closest;
+    // Find the first tile whose center is to the right of the finger
+    for (let tile of targetRow.tiles) {
+        const rect = tile.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        if (x < centerX) return tile;
+    }
+
+    // Otherwise, finger is past the last tile in that row
+    return null;
 }
 
 
