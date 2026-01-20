@@ -834,19 +834,18 @@ function handleTouchMove(e) {
 
     const touch = e.touches[0];
 
-    // Move clone
+    // Move the floating clone
     touchClone.style.left = (touch.clientX - touchOffsetX) + "px";
     touchClone.style.top = (touch.clientY - touchOffsetY) + "px";
 
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
-
     const dzRect = dropZone.getBoundingClientRect();
+    const tcRect = tileContainer.getBoundingClientRect();
 
-    // Horizontal-only detection (iPhone-safe)
+    // Very forgiving "inside drop zone" check — iPhone-safe
     const insideDropZone =
-        touch.clientX >= dzRect.left &&
-        touch.clientX <= dzRect.right;
+        touch.clientY >= dzRect.top - 40; // anything below (or near) the top of the drop zone
 
     if (insideDropZone) {
         const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
@@ -857,6 +856,7 @@ function handleTouchMove(e) {
             dropZone.insertBefore(currentlyDraggingTile, afterElement);
         }
     } else {
+        // Above the drop zone → back to tile container
         tileContainer.appendChild(currentlyDraggingTile);
         currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
     }
@@ -880,52 +880,27 @@ function handleTouchEnd(e) {
 // Safety for iOS touch cancel
 window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 
-
 function getDragAfterElement(container, x, y) {
     const tiles = [...container.querySelectorAll(".tile:not(.dragging)")];
     if (tiles.length === 0) return null;
 
-    // Group tiles into rows based on midpoint Y
-    const rows = [];
+    // Linear, horizontal-only ordering — rows are ignored on purpose.
+    let closest = null;
+    let closestOffset = Number.NEGATIVE_INFINITY;
+
     tiles.forEach(tile => {
         const rect = tile.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
+        const tileCenterX = rect.left + rect.width / 2;
+        const offset = x - tileCenterX;
 
-        let row = rows.find(r => Math.abs(r.midY - midY) < 12);
-        if (!row) {
-            row = { midY, tiles: [] };
-            rows.push(row);
-        }
-        row.tiles.push(tile);
-    });
-
-    // Pick the row closest to the finger
-    let targetRow = rows[0];
-    let minDist = Infinity;
-    rows.forEach(row => {
-        const dist = Math.abs(y - row.midY);
-        if (dist < minDist) {
-            minDist = dist;
-            targetRow = row;
+        // We want the closest tile whose center is to the RIGHT of the finger
+        if (offset < 0 && offset > closestOffset) {
+            closestOffset = offset;
+            closest = tile;
         }
     });
 
-    // Sort tiles in that row by X
-    targetRow.tiles.sort((a, b) => {
-        const ax = a.getBoundingClientRect().left;
-        const bx = b.getBoundingClientRect().left;
-        return ax - bx;
-    });
-
-    // Find the first tile whose center is to the right of the finger
-    for (let tile of targetRow.tiles) {
-        const rect = tile.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        if (x < centerX) return tile;
-    }
-
-    // Otherwise, finger is past the last tile in that row
-    return null;
+    return closest; // null means "append at end"
 }
 
 
