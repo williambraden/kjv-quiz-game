@@ -905,15 +905,35 @@ window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 function getDragAfterElement(container, x, y) {
     const elements = [...container.querySelectorAll(".tile:not(.dragging)")];
 
+    if (elements.length === 0) return null;
+
+    // Determine row break by checking the top of the first tile
+    const firstRect = elements[0].getBoundingClientRect();
+    const rowTop = firstRect.top;
+    const rowHeight = firstRect.height;
+
+    // ⭐ Determine which row the finger is in
+    const inFirstRow = y < rowTop + rowHeight * 1.2;
+
+    // Filter tiles by row
+    const rowTiles = elements.filter(el => {
+        const r = el.getBoundingClientRect();
+        return inFirstRow
+            ? r.top < rowTop + rowHeight * 1.2
+            : r.top >= rowTop + rowHeight * 1.2;
+    });
+
+    // If no tiles in that row, fall back to all tiles
+    const candidates = rowTiles.length > 0 ? rowTiles : elements;
+
+    // Find nearest tile horizontally
     let closest = null;
     let closestDist = Number.POSITIVE_INFINITY;
 
-    elements.forEach(el => {
+    candidates.forEach(el => {
         const rect = el.getBoundingClientRect();
         const dx = x - (rect.left + rect.width / 2);
-        const dy = y - (rect.top + rect.height / 2);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
+        const dist = Math.abs(dx); // ⭐ horizontal only
         if (dist < closestDist) {
             closestDist = dist;
             closest = el;
