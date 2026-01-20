@@ -903,40 +903,49 @@ window.addEventListener("touchcancel", handleTouchEnd, { passive: false });
 
 
 function getDragAfterElement(container, x, y) {
-    const elements = [...container.querySelectorAll(".tile:not(.dragging)")];
+    const tiles = [...container.querySelectorAll(".tile:not(.dragging)")];
+    if (tiles.length === 0) return null;
 
-    if (elements.length === 0) return null;
+    // Group tiles into rows based on their top position
+    const rows = [];
+    tiles.forEach(tile => {
+        const rect = tile.getBoundingClientRect();
+        const top = rect.top;
 
-    // Determine row break by checking the top of the first tile
-    const firstRect = elements[0].getBoundingClientRect();
-    const rowTop = firstRect.top;
-    const rowHeight = firstRect.height;
-
-    // ⭐ Determine which row the finger is in
-    const inFirstRow = y < rowTop + rowHeight * 1.2;
-
-    // Filter tiles by row
-    const rowTiles = elements.filter(el => {
-        const r = el.getBoundingClientRect();
-        return inFirstRow
-            ? r.top < rowTop + rowHeight * 1.2
-            : r.top >= rowTop + rowHeight * 1.2;
+        // Find an existing row within a small vertical threshold
+        let row = rows.find(r => Math.abs(r.top - top) < 10);
+        if (!row) {
+            row = { top, tiles: [] };
+            rows.push(row);
+        }
+        row.tiles.push(tile);
     });
 
-    // If no tiles in that row, fall back to all tiles
-    const candidates = rowTiles.length > 0 ? rowTiles : elements;
+    // Determine which row the finger is closest to
+    let targetRow = rows[0];
+    let minRowDist = Infinity;
 
-    // Find nearest tile horizontally
+    rows.forEach(row => {
+        const dist = Math.abs(y - row.top);
+        if (dist < minRowDist) {
+            minRowDist = dist;
+            targetRow = row;
+        }
+    });
+
+    // Now find the nearest tile horizontally within that row
     let closest = null;
-    let closestDist = Number.POSITIVE_INFINITY;
+    let closestDist = Infinity;
 
-    candidates.forEach(el => {
-        const rect = el.getBoundingClientRect();
-        const dx = x - (rect.left + rect.width / 2);
-        const dist = Math.abs(dx); // ⭐ horizontal only
+    targetRow.tiles.forEach(tile => {
+        const rect = tile.getBoundingClientRect();
+        const tileCenterX = rect.left + rect.width / 2;
+        const dx = x - tileCenterX;
+        const dist = Math.abs(dx);
+
         if (dist < closestDist) {
             closestDist = dist;
-            closest = el;
+            closest = tile;
         }
     });
 
