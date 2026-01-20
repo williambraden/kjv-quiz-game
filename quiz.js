@@ -841,7 +841,7 @@ function handleTouchMove(e) {
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
 
-    // Determine if finger is visually inside drop zone (iPhone‑safe)
+    // Determine if finger is visually inside drop zone
     const dzRect = dropZone.getBoundingClientRect();
     const insideDropZone =
         touch.clientX >= dzRect.left &&
@@ -850,16 +850,40 @@ function handleTouchMove(e) {
         touch.clientY <= dzRect.bottom;
 
     if (insideDropZone) {
-        // Find nearest tile for 2D reordering
-        const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
 
-        // ⭐ iPhone‑safe drag‑to‑end logic
-        const lastTile = dropZone.lastElementChild;
+        // ⭐ Build row groups (same logic as getDragAfterElement)
+        const tiles = [...dropZone.querySelectorAll(".tile:not(.dragging)")];
+        const rows = [];
+        tiles.forEach(tile => {
+            const rect = tile.getBoundingClientRect();
+            let row = rows.find(r => Math.abs(r.top - rect.top) < 10);
+            if (!row) {
+                row = { top: rect.top, tiles: [] };
+                rows.push(row);
+            }
+            row.tiles.push(tile);
+        });
+
+        // Find the row closest to the finger
+        let targetRow = rows[0];
+        let minDist = Infinity;
+        rows.forEach(row => {
+            const dist = Math.abs(touch.clientY - row.top);
+            if (dist < minDist) {
+                minDist = dist;
+                targetRow = row;
+            }
+        });
+
+        // ⭐ Find last tile in that row
+        const rowTiles = targetRow.tiles;
+        const lastTile = rowTiles[rowTiles.length - 1];
+
+        // ⭐ iPhone‑safe drag‑to‑end logic for the active row
         if (lastTile) {
             const rect = lastTile.getBoundingClientRect();
             const lastCenter = rect.left + rect.width / 2;
 
-            // iPhone never reaches rect.right, but always passes center
             if (touch.clientX > lastCenter) {
                 dropZone.appendChild(currentlyDraggingTile);
                 if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
@@ -867,7 +891,8 @@ function handleTouchMove(e) {
             }
         }
 
-        // Insert before nearest tile or append
+        // ⭐ Insert before nearest tile in the active row
+        const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
         if (afterElement == null) {
             dropZone.appendChild(currentlyDraggingTile);
         } else {
@@ -880,7 +905,6 @@ function handleTouchMove(e) {
         currentlyDraggingTile.classList.remove("correct-word", "incorrect-word");
     }
 
-    // Live red/green update while dragging
     if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
 }
 
