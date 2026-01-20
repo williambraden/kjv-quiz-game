@@ -841,7 +841,7 @@ function handleTouchMove(e) {
     const dropZone = document.getElementById("scrambleDrop");
     const tileContainer = document.getElementById("scrambleTiles");
 
-    // ⭐ iPhone‑safe: determine if finger is visually inside drop zone
+    // Determine if finger is visually inside drop zone (iPhone‑safe)
     const dzRect = dropZone.getBoundingClientRect();
     const insideDropZone =
         touch.clientX >= dzRect.left &&
@@ -853,11 +853,14 @@ function handleTouchMove(e) {
         // Find nearest tile for 2D reordering
         const afterElement = getDragAfterElement(dropZone, touch.clientX, touch.clientY);
 
-        // ⭐ Drag‑to‑end fix for iPhone
+        // ⭐ iPhone‑safe drag‑to‑end logic
         const lastTile = dropZone.lastElementChild;
         if (lastTile) {
             const rect = lastTile.getBoundingClientRect();
-            if (touch.clientX > rect.right) {
+            const lastCenter = rect.left + rect.width / 2;
+
+            // iPhone never reaches rect.right, but always passes center
+            if (touch.clientX > lastCenter) {
                 dropZone.appendChild(currentlyDraggingTile);
                 if (window._scrambleUpdateFeedback) window._scrambleUpdateFeedback();
                 return;
