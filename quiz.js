@@ -192,6 +192,11 @@ function createPlayerProfile(name, avatar, color) {
   });
 }
 
+async function loadPlayerProfile() {
+  const uid = auth.currentUser.uid;
+  const doc = await db.collection("profiles").doc(uid).get();
+  return doc.exists ? doc.data() : null;
+}
 
 function continueGame() {
 
@@ -2134,5 +2139,6 @@ function fadeToBlack(callback) {
 });
 
 	
+
 
 
