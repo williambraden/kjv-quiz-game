@@ -313,42 +313,7 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
   pointer-events: none; transition: opacity 1s ease;
   z-index: 9999;
 "></div>
-<!-- Firebase App -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
 
-<!-- Firebase Auth -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
-
-<!-- Firestore -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCoS4UP2YNd3RG-5KEf6t1xr890MV2bG1A",
-    authDomain: "biblequizgame.firebaseapp.com",
-    projectId: "biblequizgame",
-    storageBucket: "biblequizgame.firebasestorage.app",
-    messagingSenderId: "165417801422",
-    appId: "1:165417801422:web:e07ba29e4b0f8cb3dde29f"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  // Auto-login anonymously
-  signInAnonymously(auth)
-    .then(() => {
-      console.log("Signed in as:", auth.currentUser.uid);
-    })
-    .catch((err) => console.error("Auth error:", err));
-</script>
 <script src="quiz.js"></script>
 </body>
 </html>
-
-

@@ -1,12 +1,3 @@
-auth.signInAnonymously()
-  .then(() => {
-    console.log("Signed in as:", auth.currentUser.uid);
-  })
-  .catch((error) => {
-    console.error("Auth error:", error);
-  });
-
-
 // ==============================
 // 📚 Bible Book Lists
 // ==============================
@@ -172,31 +163,6 @@ window.addEventListener("DOMContentLoaded", () => {
     talentsOutput.value = talentsSlider.value;
 });
 
-function createPlayerProfile(name, avatar, color) {
-  const uid = auth.currentUser.uid;
-
-  return db.collection("profiles").doc(uid).set({
-    name,
-    avatar,
-    color,
-    lifetimeStats: {
-      gamesPlayed: 0,
-      correct: 0,
-      incorrect: 0,
-      fastestTime: null,
-      averageTime: null,
-      streakBest: 0
-    },
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  });
-}
-
-async function loadPlayerProfile() {
-  const uid = auth.currentUser.uid;
-  const doc = await db.collection("profiles").doc(uid).get();
-  return doc.exists ? doc.data() : null;
-}
 
 function continueGame() {
 
@@ -1675,7 +1641,6 @@ function resetDefaults() {
 }
 
 
-
 function offerRedeemTime() {
     const player = players[currentPlayerIndex];
 	redemptionActive = true;
@@ -2139,6 +2104,3 @@ function fadeToBlack(callback) {
 });
 
 	
-
-
-
