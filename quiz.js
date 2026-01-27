@@ -1,3 +1,12 @@
+auth.signInAnonymously()
+  .then(() => {
+    console.log("Signed in as:", auth.currentUser.uid);
+  })
+  .catch((error) => {
+    console.error("Auth error:", error);
+  });
+
+
 // ==============================
 // 📚 Bible Book Lists
 // ==============================
@@ -2105,3 +2114,4 @@ function fadeToBlack(callback) {
 });
 
 	
+
