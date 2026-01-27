@@ -172,6 +172,26 @@ window.addEventListener("DOMContentLoaded", () => {
     talentsOutput.value = talentsSlider.value;
 });
 
+function createPlayerProfile(name, avatar, color) {
+  const uid = auth.currentUser.uid;
+
+  return db.collection("profiles").doc(uid).set({
+    name,
+    avatar,
+    color,
+    lifetimeStats: {
+      gamesPlayed: 0,
+      correct: 0,
+      incorrect: 0,
+      fastestTime: null,
+      averageTime: null,
+      streakBest: 0
+    },
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  });
+}
+
 
 function continueGame() {
 
@@ -2114,4 +2134,5 @@ function fadeToBlack(callback) {
 });
 
 	
+
 
