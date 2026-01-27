@@ -38,7 +38,9 @@ const newTestamentBooks = [
 
 let gameMode = null; 
 // "single" or "local-multiplayer"
-
+let singlePlayerSettings = null;
+let totalRounds = 3;
+let currentRound = 1;
 
 let rounds = 3;
 let players = [];                // array of player objects
@@ -75,6 +77,7 @@ let redemptionTimeLeft = 0;   // if you use this
 
 let scrambledAlreadyChecked = false;
 let currentVerseWords = [];
+let currentScrambleAnswer = [];
 
 
 
@@ -107,7 +110,8 @@ window.onload = function() {
     document.getElementById("timerInput").value = timerLength;
     document.getElementById("timerEnabled").checked = timerEnabled;
     document.getElementById("timeBonusCheckbox").checked = timeBonusEnabled;
-
+	document.getElementById("singlePlayerName").value = "Player 1";
+	
     // ⭐ Restore starting talents safely
     if (settings.startingTalents !== undefined) {
         document.getElementById("talentsInput").value = settings.startingTalents;
@@ -265,71 +269,58 @@ document.getElementById("roundsInput").addEventListener("input", function () {
    document.getElementById("playerNames").innerHTML = inputs;
 }
 
-function saveSinglePlayerOptions() {
-    console.log("Saving Single Player Options...");
+function startSinglePlayerGame() {
 
-    // Read values from the UI
-    const name = document.getElementById("singlePlayerName").value.trim();
+    // Read values directly from UI
+    let name = document.getElementById("singlePlayerName").value.trim();
+    if (!name) name = "Player 1";   // automatic default
+
     const rounds = parseInt(document.getElementById("singlePlayerRoundsInput").value);
-    const quizType = document.getElementById("singlePlayerQuizType").value;
-    const testament = document.getElementById("singlePlayerTestament").value;
-    const timerEnabled = document.getElementById("singlePlayerTimerToggle").checked;
-    const timeBonus = document.getElementById("singlePlayerTimeBonus").checked;
-    const timerLength = parseInt(document.getElementById("singlePlayerTimerLength").value);
+    const quizTypeUI = document.getElementById("singlePlayerQuizType").value;
+    const testamentUI = document.getElementById("singlePlayerTestament").value;
+    const timerEnabledUI = document.getElementById("singlePlayerTimerToggle").checked;
+    const timeBonusUI = document.getElementById("singlePlayerTimeBonus").checked;
+    const timerLengthUI = parseInt(document.getElementById("singlePlayerTimerLength").value);
 
-    // Basic validation
-    if (!name) {
-        alert("Please enter a player name.");
-        return;
-    }
-
-    // Store in global variables (you can adjust these names if needed)
-    window.singlePlayerSettings = {
+    // Store settings directly (no separate save button)
+    singlePlayerSettings = {
         name,
         rounds,
-        quizType,
-        testament,
-        timerEnabled,
-        timeBonus,
-        timerLength
+        quizType: quizTypeUI,
+        testament: testamentUI,
+        timerEnabled: timerEnabledUI,
+        timeBonus: timeBonusUI,
+        timerLength: timerLengthUI
     };
 
-    console.log("Single Player Settings Saved:", window.singlePlayerSettings);
+    console.log("Single Player Settings:", singlePlayerSettings);
 
-    alert("Settings saved!");
-}
-
-function startSinglePlayerGame() {
-    if (!window.singlePlayerSettings) {
-        alert("Please save your settings first.");
-        return;
-    }
-
-    console.log("Starting Single Player Game...");
-	showScreen("screenQuiz");
     // Initialize player object
-    window.currentPlayer = {
-        name: window.singlePlayerSettings.name,
-        score: 0,
+    currentPlayer = {
+        name,
+        points: 0,
         correct: 0,
         incorrect: 0,
-        fastest: null
+        avgTime: 0,
+        totalTime: 0,
+        questionsAnswered: 0,
+        fastestTime: null
     };
 
-    // Set rounds, timer, etc.
-    totalRounds = window.singlePlayerSettings.rounds;
+    // Apply settings globally
+    totalRounds = rounds;
     currentRound = 1;
-    quizType = window.singlePlayerSettings.quizType;
-    testament = window.singlePlayerSettings.testament;
-    timerEnabled = window.singlePlayerSettings.timerEnabled;
-    timeBonusEnabled = window.singlePlayerSettings.timeBonus;
-    timerLength = window.singlePlayerSettings.timerLength;
+    quizType = quizTypeUI;
+    testament = testamentUI;
+    timerEnabled = timerEnabledUI;
+    timeBonusEnabled = timeBonusUI;
+    timerLength = timerLengthUI;
 
-    // Start the first question
+    // Start the game
+    gameMode = "single";
+    showScreen("screenQuiz");
     startTrivia();
 }
-
-
 function saveOptions() {
 
   console.log("Checkbox state at saveOptions:", document.getElementById("timerEnabled").checked);
@@ -483,11 +474,10 @@ function backToMenu() {
 
 function getActivePlayerName() {
     if (gameMode === "single") {
-        return singlePlayerSettings.name;
+        return singlePlayerSettings ? singlePlayerSettings.name : (currentPlayer?.name || "Player");
     }
     return players[currentPlayerIndex].name;
 }
-
 function getPlayerCount() {
     return gameMode === "single" ? 1 : players.length;
 }
@@ -501,22 +491,19 @@ function isMultipleChoice() {
 
 
 function startTrivia() {
-	showScreen("screenQuiz");
+    showScreen("screenQuiz");
     questionCount = 0;
 
     if (gameMode === "single") {
-        // Single Player
-        currentPlayerIndex = 0; // not really used, but keeps runQuiz happy
+        currentPlayerIndex = 0; // not really used in single, but kept consistent
         totalQuestions = singlePlayerSettings.rounds;
     } else {
-        // Local Multiplayer
         currentPlayerIndex = 0;
         totalQuestions = rounds * players.length;
     }
 
     runQuiz();
 }
-
 
 async function runQuiz() {
     // Reset leftover state
@@ -526,7 +513,9 @@ async function runQuiz() {
 
     const playerCount = getPlayerCount();
     const isSingle = (gameMode === "single");
-
+	if (gameMode !== "single") {
+	  turnOwner = currentPlayerIndex;
+	}
     // End game check
     if (questionCount >= totalQuestions) {
         endGame();
@@ -1013,7 +1002,9 @@ function startTimer(typeToUse) {
     }, 100); // 100ms = 0.1s precision
 }
 
-function handleTimerExpired(typeToUse) {
+function handleTimerExpired() {
+    clearInterval(timerInterval);
+
     // Mark incorrect
     if (gameMode === "single") {
         currentPlayer.incorrect++;
@@ -1025,82 +1016,52 @@ function handleTimerExpired(typeToUse) {
 
     const reference = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
 
-    // Determine correct text based on mode
-    let correctText;
-    if (typeToUse === "multiple") {
-        correctText = `The correct answer was ${currentVerse.book}.`;
-    } else if (typeToUse === "fill") {
+    // SCRAMBLE MODE → no redemption ever
+    if (currentRoundType === "scramble" || quizType === "scramble") {
+        const correctText = `Time's up!<br>The correct verse was:<br>"${currentVerse.text}"<br><em>Reference: ${reference}</em>`;
+        handleIncorrectAnswer(correctText, /*skipRedemption=*/true);
+        return;
+    }
+
+    // MULTIPLE CHOICE
+    if (currentRoundType === "multiple" || quizType === "multiple") {
+        const correctText = `Time's up!<br>The correct answer was ${currentVerse.book}.<br><em>Reference: ${reference}</em>`;
+        handleIncorrectAnswer(correctText);
+        return;
+    }
+
+    // FILL-IN-THE-BLANK
+    if (currentRoundType === "fill" || quizType === "fill") {
         const word = currentBlankWord || getCorrectWord() || "(unknown)";
-        correctText = `The correct word was "${word}".`;
-    } else {
-        // Scramble
-        correctText = `The correct verse was:<br>${currentVerse.text}`;
+        const correctText = `Time's up!<br>The correct word was "${word}".<br><em>Reference: ${reference}</em>`;
+        handleIncorrectAnswer(correctText);
+        return;
     }
 
-    // Show timeout message
-    document.getElementById("result").innerHTML =
-        `⏰ Time’s up!<br>❌ Incorrect.<br>${correctText}<br><em>Reference: ${reference}</em>`;
-
-    // Disable UI
-    if (typeToUse === "multiple") {
-        disableOptions();
-    } else {
-        const input = document.getElementById("fillAnswer");
-        const submitBtn = document.getElementById("submitBtn");
-        if (input) input.disabled = true;
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Submitted";
-        }
-    }
-
-    // MULTIPLAYER: begin redemption sequence
-    if (gameMode !== "single") {
-
-        // Reset redemption tracking for this question
-        redemptionAttempted.clear();
-
-        // Find the first eligible redeemer (starting AFTER the turn owner)
-        const next = getNextPlayerForRedemption();
-
-        if (next !== null) {
-            currentPlayerIndex = next;
-            offerRedeemTime();
-            return;
-        }
-    }
-
-    // No redemption possible → end question normally
-    if (gameMode !== "single") {
-        currentPlayerIndex = (turnOwner + 1) % players.length;
-    }
-
-    updateScoreboard();
-
-    document.getElementById("controls").innerHTML =
-        `<button onclick="runQuiz()">Next Question</button>`;
+    // FALLBACK (should never hit)
+    const fallbackText = `Time's up!<br><em>Reference: ${reference}</em>`;
+    handleIncorrectAnswer(fallbackText);
 }
-
 
 function togglePause() {
-  paused = !paused; // flip the paused state
+    paused = !paused; // flip the paused state
 
-  if (paused) {
-    document.getElementById("turn").innerHTML =
-      `Turn: ${players[currentPlayerIndex].name} — ⏸ Paused`;
-  } else {
-    document.getElementById("turn").innerHTML =
-      `Turn: ${players[currentPlayerIndex].name} — ▶️ Resumed`;
-    // ✅ No need to call startTimer() again
-  }
-  // Update button text
-  const btn = document.querySelector("#controls button");
-  if (btn) {
-    btn.textContent = paused ? "Resume" : "Pause";
-  }
+    const name = getActivePlayerName();
+
+    if (paused) {
+        document.getElementById("turn").innerHTML =
+            `Turn: ${name} — ⏸ Paused`;
+    } else {
+        document.getElementById("turn").innerHTML =
+            `Turn: ${name} — ▶️ Resumed`;
+    }
+
+    // Update button text
+    const btn = document.querySelector("#controls button");
+    if (btn) {
+        btn.textContent = paused ? "Resume" : "Pause";
+    }
 }
-
-
 
 
   function disableOptions() {
@@ -1350,21 +1311,33 @@ function enableAnswerUI() {
 
 
 function recordAnswerTime(isCorrect) {
-  if (!timerEnabled) return;
+    if (!timerEnabled) return;
 
-  const timeUsed = timerLength - timeLeft;
+    const timeUsed = timerLength - timeLeft;
 
-  players[currentPlayerIndex].totalTime += timeUsed;
-players[currentPlayerIndex].questionsAnswered++;
-players[currentPlayerIndex].avgTime =
-    players[currentPlayerIndex].totalTime / players[currentPlayerIndex].questionsAnswered;
+    if (gameMode === "single") {
+        const p = currentPlayer;
+        if (!p) return;
 
-if (players[currentPlayerIndex].fastestTime === null ||
-    timeUsed < players[currentPlayerIndex].fastestTime) {
-    players[currentPlayerIndex].fastestTime = timeUsed;
-}
+        p.totalTime = (p.totalTime || 0) + timeUsed;
+        p.questionsAnswered = (p.questionsAnswered || 0) + 1;
+        p.avgTime = p.totalTime / p.questionsAnswered;
+
+        if (p.fastestTime === null || p.fastestTime === undefined || timeUsed < p.fastestTime) {
+            p.fastestTime = timeUsed;
+        }
+        return;
     }
-  
+
+    const p = players[currentPlayerIndex];
+    p.totalTime += timeUsed;
+    p.questionsAnswered++;
+    p.avgTime = p.totalTime / p.questionsAnswered;
+
+    if (p.fastestTime === null || timeUsed < p.fastestTime) {
+        p.fastestTime = timeUsed;
+    }
+}
 
 
 
@@ -1383,12 +1356,8 @@ function nextQuestion() {
   runQuiz();
 }
 
-function awardPoints(basePoints, timeLeft = 0, isSteal = false) {
+function awardPoints(basePoints, timeLeft = 0, ) {
     let total = basePoints;
-
-    if (isSteal) {
-        total = 25;
-    }
 
     if (timerEnabled && timeBonusEnabled && timeLeft > 0) {
         total += timeLeft;
@@ -1913,9 +1882,70 @@ function endQuestionNoSteal() {
 }
 
 
+function endGameSinglePlayer() {
 
+    fadeToBlack(() => {
+
+        // Hide scoreboard for full-screen effect
+        document.getElementById("scoreboard").style.display = "none";
+        document.getElementById("result").innerHTML = "";
+        document.getElementById("controls").innerHTML = "";
+        document.getElementById("progress").innerHTML = "";
+        document.getElementById("turn").innerHTML = "";
+
+        const p = currentPlayer;
+
+        const accuracy = (p.correct + p.incorrect > 0)
+            ? ((p.correct / (p.correct + p.incorrect)) * 100).toFixed(1)
+            : 0;
+
+        const fastest = p.fastestTime !== null
+            ? p.fastestTime.toFixed(1) + "s"
+            : "—";
+
+        const avg = p.avgTime
+            ? p.avgTime.toFixed(1) + "s"
+            : "0s";
+
+        // Build the single-player results screen
+        document.getElementById("quiz").innerHTML = `
+            <h2 style="text-align:center; font-size:2em; margin-bottom:20px;">
+                🏆 Final Results 🏆
+            </h2>
+
+            <div style="
+                max-width:500px;
+                margin:0 auto;
+                padding:20px;
+                background:#f7f7f7;
+                border-radius:10px;
+                box-shadow:0 0 15px rgba(0,0,0,0.2);
+                text-align:center;
+            ">
+                <h3>${p.name}</h3>
+
+                <p><strong>Points:</strong> ${p.points}</p>
+                <p><strong>Correct:</strong> ${p.correct}</p>
+                <p><strong>Incorrect:</strong> ${p.incorrect}</p>
+                <p><strong>Accuracy:</strong> ${accuracy}%</p>
+                <p><strong>Average Time:</strong> ${avg}</p>
+                <p><strong>Fastest Answer:</strong> ${fastest}</p>
+            </div>
+        `;
+
+        // Show buttons
+        document.getElementById("controls").innerHTML = `
+            <button onclick="startNewGame()">Play Again</button>
+            <button onclick="backToMenu()">Back to Menu</button>
+        `;
+    });
+}
 
 function endGame() {
+	if (gameMode === "single") {
+    return endGameSinglePlayer();
+}
+
   fadeToBlack(() => {
 
     // Hide scoreboard for full-screen effect
@@ -2056,9 +2086,6 @@ function startNewGame() {
   questionCount = 0;
   currentPlayerIndex = 0;
 
-  // Reset per-round state
-  stealMode = false;
-  stealIndex = 0;
 
   // Clear UI
   document.getElementById("result").innerHTML = "";
