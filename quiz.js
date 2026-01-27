@@ -1005,20 +1005,11 @@ function startTimer(typeToUse) {
 function handleTimerExpired() {
     clearInterval(timerInterval);
 
-    // Mark incorrect
-    if (gameMode === "single") {
-        currentPlayer.incorrect++;
-    } else {
-        players[currentPlayerIndex].incorrect++;
-    }
-
-    recordAnswerTime(false);
-
     const reference = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
 
     // SCRAMBLE MODE → no redemption ever
     if (currentRoundType === "scramble" || quizType === "scramble") {
-        const correctText = `Time's up!<br>The correct verse was:<br>"${currentVerse.text}"<br><em>Reference: ${reference}</em>`;
+        const correctText = `Time's up!<br>The correct verse was:<br>"${currentVerse.text}"`;
         handleIncorrectAnswer(correctText, /*skipRedemption=*/true);
         return;
     }
@@ -1042,6 +1033,7 @@ function handleTimerExpired() {
     const fallbackText = `Time's up!<br><em>Reference: ${reference}</em>`;
     handleIncorrectAnswer(fallbackText);
 }
+
 
 function togglePause() {
     paused = !paused; // flip the paused state
@@ -1122,17 +1114,15 @@ function handleCorrectAnswer(basePoints, timeLeft = 0, isScramble = false) {
     disableAllAnswerUI();
     updateScoreboard();
 
-    // Rotate turn (multiplayer only)
-    if (gameMode !== "single") {
-        currentPlayerIndex = (turnOwner + 1) % players.length;
-    }
 
     document.getElementById("controls").innerHTML =
-        `<button onclick="runQuiz()">Next Question</button>`;
+        `<button onclick="nextQuestion()">Next Question</button>`;
 }
 
-function handleIncorrectAnswer(correctText, skipRedemption = false)
- {
+
+function handleIncorrectAnswer(correctText, skipRedemption = false) {
+
+    // Count incorrect (ONLY here, never in timerExpired)
     if (gameMode === "single") {
         currentPlayer.incorrect++;
     } else {
@@ -1143,20 +1133,20 @@ function handleIncorrectAnswer(correctText, skipRedemption = false)
 
     const reference = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
 
-    // Disable main answer UI
+    // Disable all answer UI
     disableAllAnswerUI();
 
     // MULTIPLAYER: begin redemption sequence
     if (!skipRedemption && gameMode !== "single") {
-    redemptionAttempted.clear();
-    const next = getNextPlayerForRedemption();
-    if (next !== null) {
-        currentPlayerIndex = next;
-        offerRedeemTime();
-        return;
-    }
-}
+        redemptionAttempted.clear();
+        const next = getNextPlayerForRedemption();
 
+        if (next !== null) {
+            currentPlayerIndex = next;
+            offerRedeemTime();
+            return;
+        }
+    }
 
     // No redemption possible → show final incorrect result
     document.getElementById("result").innerHTML =
@@ -1164,14 +1154,11 @@ function handleIncorrectAnswer(correctText, skipRedemption = false)
 
     updateScoreboard();
 
-    // Rotate turn
-    if (gameMode !== "single") {
-        currentPlayerIndex = (turnOwner + 1) % players.length;
-    }
-
+ 
     document.getElementById("controls").innerHTML =
-        `<button onclick="runQuiz()">Next Question</button>`;
+        `<button onclick="nextQuestion()">Next Question</button>`;
 }
+
 
 function submitMultipleChoice(selectedBook) {
     clearInterval(timerInterval);
@@ -1198,6 +1185,7 @@ function submitMultipleChoice(selectedBook) {
 }
 
 }
+
 
 function submitFillInBlank() {
     clearInterval(timerInterval);
@@ -1277,6 +1265,7 @@ function submitScrambledVerse() {
     }
 }
 
+
 function disableAllAnswerUI() {
     disableOptions();
 
@@ -1286,6 +1275,7 @@ function disableAllAnswerUI() {
     if (input) input.disabled = true;
     if (submitBtn) submitBtn.disabled = true;
 }
+
 
 function enableAnswerUI() {
     // Multiple choice
@@ -1343,17 +1333,21 @@ function recordAnswerTime(isCorrect) {
 
 
 function nextQuestion() {
-  currentPlayerIndex = (turnOwner + 1) % players.length;
-  persistSettings();
 
-  scrambledAlreadyChecked = false;
+    // Rotate turn only in multiplayer
+    if (gameMode !== "single") {
+        turnOwner = (turnOwner + 1) % players.length;
+        currentPlayerIndex = turnOwner;
+    }
 
-  const btn = document.getElementById("submitBtn");
-  if (btn) {
-      btn.disabled = false;
-  }
+    scrambledAlreadyChecked = false;
 
-  runQuiz();
+    const btn = document.getElementById("submitBtn");
+    if (btn) {
+        btn.disabled = false;
+    }
+
+    runQuiz();
 }
 
 function awardPoints(basePoints, timeLeft = 0, ) {
@@ -1646,13 +1640,7 @@ function resetDefaults() {
   }
 }
 
-function advanceTurn() {
-    if (gameMode === "single") {
-        return; // no rotation needed
-    }
 
-    currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-}
 
 function offerRedeemTime() {
     const player = players[currentPlayerIndex];
@@ -1865,9 +1853,6 @@ function endQuestionNoSteal() {
         submitBtn.textContent = "Submitted";
     }
 
-    // Advance turn owner
-    turnOwner = (turnOwner + 1) % players.length;
-    currentPlayerIndex = turnOwner;
 
     // Reset per-question flags
     redemptionAttempted.clear();
@@ -1878,7 +1863,7 @@ function endQuestionNoSteal() {
 
     // Show Next Question button
     document.getElementById("controls").innerHTML =
-        `<button onclick="runQuiz()">Next Question</button>`;
+        `<button onclick="nextQuestion()">Next Question</button>`;
 }
 
 
