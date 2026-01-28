@@ -955,9 +955,12 @@ function renderFillInBlank(verseText) {
 }
 
 function focusFillBlankInput() {
-    const input = document.getElementById("fillAnswer");
-    if (input) input.focus();
+    setTimeout(() => {
+        const input = document.getElementById("fillAnswer");
+        if (input && !input.disabled) input.focus();
+    }, 0);
 }
+
 
 
 	
@@ -2112,6 +2115,7 @@ function fadeToBlack(callback) {
 });
 
 	
+
 
 
 
