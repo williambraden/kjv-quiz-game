@@ -954,6 +954,10 @@ function renderFillInBlank(verseText) {
     }
 }
 
+function focusFillBlankInput() {
+    const input = document.getElementById("fillAnswer");
+    if (input) input.focus();
+}
 
 
 	
@@ -1708,6 +1712,7 @@ function acceptRedeemTime() {
 
     startRedemptionTimer();
     enableAnswerUI();
+	focusFillBlankInput();
     document.getElementById("redeemOverlay").style.display = "none";
 }
 
@@ -1733,6 +1738,7 @@ function startRedemptionTimer() {
 
     updateRedemptionUI();
 	enableAnswerUI();
+	focusFillBlankInput();
 
 
     redemptionTimer = setInterval(() => {
@@ -2106,5 +2112,6 @@ function fadeToBlack(callback) {
 });
 
 	
+
 
 
