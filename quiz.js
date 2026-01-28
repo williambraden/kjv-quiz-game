@@ -470,6 +470,8 @@ function persistSettings() {
  
 function backToMenu() {
     showScreen("screenMenu");
+	  // Show scoreboard again
+  document.getElementById("scoreboard").style.display = "block";
 }
 
 function getActivePlayerName() {
@@ -2104,3 +2106,4 @@ function fadeToBlack(callback) {
 });
 
 	
+
