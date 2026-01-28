@@ -936,7 +936,7 @@ function renderFillInBlank(verseText) {
         `<p><strong>${blankVerse}</strong></p>
          <p><em>Reference: ${reference}</em></p>
          <p>Fill in the blank:</p>
-         <input type="text" id="fillAnswer">
+         <input type="text" id="fillAnswer" autocomplete="off">
          <button id="submitBtn" onclick="submitFillInBlank()">Submit</button>`;
 
     const input = document.getElementById("fillAnswer");
@@ -2106,4 +2106,5 @@ function fadeToBlack(callback) {
 });
 
 	
+
 
