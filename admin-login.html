@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Developer Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      text-align: center;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Developer Login</h2>
+<p>Logging you in…</p>
+
+<div id="status"></div>
+
+<script type="module">
+  import { initializeApp } 
+    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+
+  import { getAuth, signInWithEmailAndPassword } 
+    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+  // Your Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCoS4UP2YNd3RG-5KEf6t1xr890MV2bG1A",
+    authDomain: "biblequizgame.firebaseapp.com",
+    projectId: "biblequizgame",
+    storageBucket: "biblequizgame.firebasestorage.app",
+    messagingSenderId: "165417801422",
+    appId: "1:165417801422:web:e07ba29e4b0f8cb3dde29f"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  const statusBox = document.getElementById("status");
+
+  // Sign in as developer
+  signInWithEmailAndPassword(auth, "willandstephb@icloud.com", "Pensacola2010!")
+    .then(() => {
+      statusBox.textContent = "Developer logged in successfully!";
+      statusBox.style.color = "green";
+
+      // Redirect after 1.5 seconds
+      setTimeout(() => {
+        window.location.href = "developer-pin.html"; // your main game page
+      }, 5000);
+    })
+    .catch(err => {
+      statusBox.textContent = "Login failed: " + err.message;
+      statusBox.style.color = "red";
+    });
+</script>
+
+</body>
+</html>

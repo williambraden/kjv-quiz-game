@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Developer PIN</title>
+    <style>
+        body { font-family: Arial; padding: 40px; text-align: center; }
+        input { font-size: 24px; width: 120px; text-align: center; }
+        button { margin-top: 20px; padding: 10px 20px; font-size: 18px; }
+    </style>
+</head>
+<body>
+
+<h1>Enter Developer PIN</h1>
+<p>This verifies your identity without needing your password.</p>
+
+<input id="pinInput" maxlength="4" placeholder="••••" type="password">
+<br>
+<button id="unlockBtn">Unlock</button>
+
+<script type="module">
+document.getElementById("unlockBtn").addEventListener("click", verifyPin);
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyCoS4UP2YNd3RG-5KEf6t1xr890MV2bG1A",
+    authDomain: "biblequizgame.firebaseapp.com",
+    projectId: "biblequizgame",
+    storageBucket: "biblequizgame.firebasestorage.app",
+    messagingSenderId: "165417801422",
+    appId: "1:165417801422:web:e07ba29e4b0f8cb3dde29f"
+  };
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const DEVELOPER_UID = "QANElecfZHe2n1BmtQ39Q7E9bNu1";
+
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        window.location.href = "admin-login.html";
+        return;
+    }
+    if (user.uid !== DEVELOPER_UID) {
+        alert("Access denied.");
+        window.location.href = "index.html";
+        return;
+    }
+});
+
+async function verifyPin() {
+    const pin = document.getElementById("pinInput").value.trim();
+
+    const adminRef = doc(db, "admins", DEVELOPER_UID);
+    const snap = await getDoc(adminRef);
+
+    if (!snap.exists()) {
+        alert("Developer admin doc missing.");
+        return;
+    }
+
+    const savedPin = snap.data().devPin;
+
+    if (pin === savedPin) {
+        window.location.href = "developer-dashboard.html";
+    } else {
+        alert("Incorrect PIN.");
+    }
+}
+</script>
+
+</body>
+</html>

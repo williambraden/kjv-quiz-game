@@ -1,3 +1,28 @@
+
+window.DEVELOPER_UID = "QANElecfZHe2n1BmtQ39Q7E9bNu1";
+
+window.addEventListener("firebase-ready", async () => {
+    const user = window.auth.currentUser;
+
+    // Detect developer login
+    if (user && user.uid === window.DEVELOPER_UID) {
+        window.isDeveloper = true;
+        console.log("Developer mode active");
+    } else {
+        window.isDeveloper = false;
+    }
+
+    // Continue with your normal startup
+    const profileId = localStorage.getItem("selectedProfileId");
+
+    if (!profileId) {
+        showProfileSelection();
+    } else {
+        startMainMenu();
+    }
+});
+
+
 // ==============================
 // 📚 Bible Book Lists
 // ==============================
@@ -215,16 +240,35 @@ function showScreen(id) {
 }
 
 
-document.getElementById("singlePlayerBtn").onclick = () => {
-    gameMode = "single";
-    showScreen("screenSingleOptions");
-};
+function startMainMenu() {
+    // Hide all other screens
+    document.getElementById("profileSelectScreen").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
 
-document.getElementById("localMultiplayerBtn").onclick = () => {
-    gameMode = "local-multiplayer";
-    showScreen("screenMultiOptions");
-};
+    // Show the existing menu HTML
+    const menu = document.getElementById("screenMenu");
+    menu.style.display = "block";
 
+    // Add Developer Dashboard button if developer is logged in
+    // (but do NOT overwrite the menu)
+    if (window.isDeveloper) {
+        let existing = document.getElementById("developerDashboardBtn");
+        if (!existing) {
+            const btn = document.createElement("button");
+            btn.id = "developerDashboardBtn";
+            btn.textContent = "Developer Dashboard";
+            btn.onclick = showDeveloperDashboard;
+
+            // Insert it under the mode selector
+            document.getElementById("modeSelector").appendChild(btn);
+        }
+    }
+
+    // Update profile display
+    updateActiveProfileDisplay();
+}
 
 
 document.getElementById("roundsInput").addEventListener("input", function () {
@@ -249,9 +293,459 @@ document.getElementById("roundsInput").addEventListener("input", function () {
     talentsOutput.value = talentsSlider.value;
 });
 
+function switchProfile() {
+    showProfileSelection();
+}
+
+async function showProfileSelection() {
+    // Hide all other screens
+    document.getElementById("screenMenu").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
+
+    // Show the profile selection screen
+    const container = document.getElementById("profileSelectScreen");
+    container.style.display = "block";
+
+    // Load all profiles from Firestore
+    const profiles = await loadAllProfiles();
+
+    // Build the UI
+    let html = `
+        <h2 style="text-align:center;">Select Your Profile</h2>
+        <div style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:15px;
+            justify-content:center;
+            margin-top:20px;
+        ">
+    `;
+
+    profiles.forEach(p => {
+        html += `
+            <div onclick="selectProfile('${p.id}')" style="
+                padding:15px;
+                border:1px solid #ccc;
+                border-radius:8px;
+                cursor:pointer;
+                width:150px;
+                background:#f9f9f9;
+                text-align:center;
+                transition:0.2s;
+            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <div style="font-size:2em;">${p.avatar || "🙂"}</div>
+                <h3 style="margin:10px 0 5px 0;">${p.name}</h3>
+            </div>
+        `;
+    });
+
+   html += `
+    </div>
+
+    <div style="text-align:center; margin-top:25px;">
+        <button onclick="showCreateProfileForm()">Create New Profile</button>
+    </div>
+
+    <div style="text-align:center; margin-top:10px;">
+        <button onclick="showCreateGroupForm()">Create Group / Become Admin</button>
+        <p style="font-size:0.85em; opacity:0.7; margin-top:5px;">
+            All group/admin requests must be approved by the Developer.
+        </p>
+    </div>
+`;
+
+    container.innerHTML = html;
+}
+
+function showCreateGroupForm() {
+    // Hide all other screens
+    document.getElementById("screenMenu").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
+
+    // Show the profile selection container but replace its contents
+    const container = document.getElementById("profileSelectScreen");
+    container.style.display = "block";
+
+    container.innerHTML = `
+        <h2 style="text-align:center;">Create Group / Become Admin</h2>
+
+        <p style="text-align:center; font-size:0.85em; opacity:0.7; margin-top:-10px;">
+            All group/admin requests must be approved by the Developer.
+        </p>
+
+        <div style="max-width:400px; margin:20px auto; display:flex; flex-direction:column; gap:12px;">
+
+            <label>Group Name *</label>
+            <input id="groupNameInput" maxlength="60">
+
+            <label>Your Name *</label>
+            <input id="adminNameInput" maxlength="40">
+
+            <label>Contact (Email or Phone) *</label>
+            <input id="contactInput" maxlength="80">
+
+            <label>Admin PIN *</label>
+            <input id="pinInput" type="password" maxlength="10">
+
+            <label>Location (optional)</label>
+            <input id="locationInput" maxlength="60">
+
+            <label>Short Description (optional)</label>
+            <textarea id="descriptionInput" maxlength="200" style="height:70px;"></textarea>
+
+            <label>Choose Icon *</label>
+            <div id="iconPicker" style="
+                display:flex;
+                flex-wrap:wrap;
+                gap:10px;
+                justify-content:center;
+                margin-top:5px;
+            "></div>
+
+            <button id="submitGroupRequestBtn" class="menuButton">
+                Submit Request
+            </button>
+
+            <button class="menuButton" onclick="showProfileSelection()">
+                Cancel
+            </button>
+        </div>
+    `;
+
+    renderIconPicker();
+    document.getElementById("submitGroupRequestBtn").onclick = submitGroupRequest;
+}
+
+const approvedIcons = [
+    "📘","📗","📙","📕",
+    "⭐","🌿","🌟","🔥",
+    "🕊️","🌈","🎯","🏆",
+    "👨‍👩‍👧‍👦","⛪","🎓"
+];
+
+let selectedIcon = null;
+
+function renderIconPicker() {
+    const picker = document.getElementById("iconPicker");
+    picker.innerHTML = "";
+
+    approvedIcons.forEach(icon => {
+        const btn = document.createElement("button");
+        btn.textContent = icon;
+        btn.className = "iconOption";
+        btn.style.fontSize = "1.6em";
+        btn.style.padding = "8px 12px";
+        btn.style.border = "1px solid #ccc";
+        btn.style.borderRadius = "6px";
+        btn.style.cursor = "pointer";
+        btn.style.background = "#fff";
+
+        btn.onclick = () => {
+            selectedIcon = icon;
+            document.querySelectorAll(".iconOption").forEach(b => {
+                b.style.border = "1px solid #ccc";
+            });
+            btn.style.border = "2px solid #007bff";
+        };
+
+        picker.appendChild(btn);
+    });
+}
+
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, c => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    }[c]));
+}
+
+async function hashPIN(pin) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hash))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+async function submitGroupRequest() {
+    const groupName = escapeHTML(document.getElementById("groupNameInput").value.trim());
+    const adminName = escapeHTML(document.getElementById("adminNameInput").value.trim());
+    const contact = escapeHTML(document.getElementById("contactInput").value.trim());
+    const pin = document.getElementById("pinInput").value.trim();
+    const location = escapeHTML(document.getElementById("locationInput").value.trim());
+    const description = escapeHTML(document.getElementById("descriptionInput").value.trim());
+
+    if (!groupName || !adminName || !contact || !pin || !selectedIcon) {
+        alert("Please fill out all required fields.");
+        return;
+    }
+
+    const pinHash = await hashPIN(pin);
+    const uid = window.auth.currentUser.uid;
+    const requestId = crypto.randomUUID();
+
+    // 1. Save admin request
+    await setDoc(doc(window.db, "adminRequests", requestId), {
+        groupName,
+        adminName,
+        contact,
+        icon: selectedIcon,
+        pinHash,
+        location,
+        description,
+        requestedAt: Date.now(),
+        approved: false,
+        createdBy: uid
+    });
+
+    // 2. Create provisional admin entry
+    await setDoc(doc(window.db, "admins", uid), {
+        groupName,
+        adminName,
+        contact,
+        icon: selectedIcon,
+        pinHash,
+        location,
+        description,
+        role: "provisionalAdmin",
+        approved: false,
+        createdAt: Date.now()
+    });
+
+    // 3. Create provisional admin profile
+    await setDoc(doc(window.db, "profiles", uid), {
+        name: adminName,
+        avatar: selectedIcon,
+        color: "#ffffff",
+        role: "provisionalAdmin",
+        adminId: uid,
+        location,
+        description,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    });
+
+    alert("Your request has been submitted! You now have limited admin access until approved.");
+    startMainMenu();
+}
+
+async function populateAdminDropdown() {
+    const admins = await loadAllAdmins();
+    const select = document.getElementById("adminSelect");
+
+    select.innerHTML = ""; // clear loading text
+
+    if (admins.length === 0) {
+        // No admins exist yet → fallback to developer
+        select.innerHTML = `
+            <option value="">(No admins found — will assign to developer)</option>
+        `;
+        return;
+    }
+
+    admins.forEach(admin => {
+        select.innerHTML += `
+            <option value="${admin.id}">
+                ${admin.name} (${admin.role})
+            </option>
+        `;
+    });
+}
+
+function showCreateProfileForm() {
+    // Hide other screens
+    document.getElementById("screenMenu").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
+
+    // Show the profile selection screen container
+    const container = document.getElementById("profileSelectScreen");
+    container.style.display = "block";
+
+    // Build the Create Profile UI
+    container.innerHTML = `
+        <h2 style="text-align:center;">Create New Profile</h2>
+
+        <div style="
+            max-width:300px;
+            margin:20px auto;
+            padding:20px;
+            background:#f9f9f9;
+            border-radius:10px;
+            border:1px solid #ccc;
+        ">
+            <label>Name:</label><br>
+            <input id="newProfileName" placeholder="Enter name" style="width:100%; margin-bottom:10px;"><br>
+
+            <label>Avatar (emoji):</label><br>
+            <input id="newProfileAvatar" placeholder="🙂" style="width:100%; margin-bottom:10px;"><br>
+
+            <label>Color (optional):</label><br>
+            <input id="newProfileColor" placeholder="#4A90E2" style="width:100%; margin-bottom:20px;"><br>
+			<label>Choose Admin / Group:</label><br>
+			<select id="adminSelect" style="width:100%; margin-bottom:10px;">
+				<option value="">Loading admins...</option>
+			</select>
+
+            <button onclick="createProfileFromForm()" style="width:100%; margin-bottom:10px;">
+                Create Profile
+            </button>
+
+            <button onclick="showProfileSelection()" style="width:100%;">
+                Back
+            </button>
+        </div>
+    `;
+	populateAdminDropdown();
+}
+
+async function editProfile() {
+    const profileId = localStorage.getItem("selectedProfileId");
+    if (!profileId) return;
+
+    const profile = await loadProfile(profileId);
+    const container = document.getElementById("profileSelectScreen");
+
+    // Hide other screens
+    document.getElementById("screenMenu").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
+
+    container.style.display = "block";
+
+    container.innerHTML = `
+        <h2 style="text-align:center;">Edit Profile</h2>
+
+        <div style="
+            max-width:300px;
+            margin:20px auto;
+            padding:20px;
+            background:#f9f9f9;
+            border-radius:10px;
+            border:1px solid #ccc;
+        ">
+            <label>Name:</label><br>
+            <input id="editProfileName" value="${profile.name}" style="width:100%; margin-bottom:10px;"><br>
+
+            <label>Avatar (emoji):</label><br>
+            <input id="editProfileAvatar" value="${profile.avatar}" style="width:100%; margin-bottom:10px;"><br>
+
+            <label>Color:</label><br>
+            <input id="editProfileColor" value="${profile.color}" style="width:100%; margin-bottom:20px;"><br>
+
+            <button onclick="saveProfileEdits('${profileId}')" style="width:100%; margin-bottom:10px;">
+                Save Changes
+            </button>
+
+            <button onclick="startMainMenu()" style="width:100%;">
+                Cancel
+            </button>
+        </div>
+    `;
+}
+
+async function saveProfileEdits(profileId) {
+    const name = document.getElementById("editProfileName").value.trim();
+    const avatar = document.getElementById("editProfileAvatar").value.trim();
+    const color = document.getElementById("editProfileColor").value.trim();
+
+    if (!name) {
+        alert("Name cannot be empty");
+        return;
+    }
+
+    const ref = doc(window.db, "profiles", profileId);
+
+    await setDoc(ref, {
+	  name,
+	  avatar,
+	  color,
+	  role: "member",          // default for now
+	  adminId: window.auth.currentUser.uid,  // temporary until admin selection UI
+	  lifetimeStats: {
+		gamesPlayed: 0,
+		correct: 0,
+		incorrect: 0,
+		fastestTime: null,
+		averageTime: null,
+		streakBest: 0
+	  },
+	  createdAt: Date.now(),
+	  updatedAt: Date.now()
+	});
+
+    startMainMenu();
+}
+
+async function createProfileFromForm() {
+    const name = document.getElementById("newProfileName").value.trim();
+    const avatar = document.getElementById("newProfileAvatar").value.trim();
+    const color = document.getElementById("newProfileColor").value.trim();
+    const selectedAdminId = document.getElementById("adminSelect").value;
+
+    const profileId = crypto.randomUUID();
+    const ref = doc(window.db, "profiles", profileId);
+
+    // If no admin selected, assign to developer (for now)
+	const adminId =
+    selectedAdminId ||
+    (window.isDeveloper ? window.DEVELOPER_UID : window.DEVELOPER_UID);
+
+    await setDoc(ref, {
+        name,
+        avatar,
+        color,
+        role: "member",
+        adminId,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    });
+
+    localStorage.setItem("selectedProfileId", profileId);
+    startMainMenu();
+}
 
 
+function selectProfile(profileId) {
+    localStorage.setItem("selectedProfileId", profileId);
+    startMainMenu();
+}
 
+
+async function updateActiveProfileDisplay() {
+    const profileId = localStorage.getItem("selectedProfileId");
+    const display = document.getElementById("activeProfileDisplay");
+
+    if (!profileId) {
+        display.innerHTML = "";
+        return;
+    }
+
+    const profile = await loadProfile(profileId);
+
+    if (!profile) {
+        display.innerHTML = "";
+        return;
+    }
+
+    display.innerHTML = `
+        <div style="display:flex; justify-content:center; align-items:center; gap:10px;">
+            <span style="font-size:1.8em;">${profile.avatar}</span>
+            <span style="font-size:1.2em; font-weight:bold;">${profile.name}</span>
+            <span style="font-size:0.9em; opacity:0.7;">(${profile.role})</span>
+        </div>
+    `;
+}
     function renderPlayerInputs() {
 
    const numPlayers = parseInt(document.getElementById("playersInput").value);
@@ -1890,6 +2384,46 @@ function endGameSinglePlayer() {
 
         const p = currentPlayer;
 
+        // Gather round stats
+        const roundStats = {
+            correct: p.correct,
+            incorrect: p.incorrect,
+            fastestTime: p.fastestTime,
+            averageTime: p.avgTime,
+            streakBest: p.bestStreak || 0,
+            points: p.points
+        };
+
+        // Load selected profile
+        const profileId = localStorage.getItem("selectedProfileId");
+        if (profileId) {
+            loadProfile(profileId).then(profile => {
+                if (profile) {
+                    const lifetime = profile.lifetimeStats;
+
+                    const updatedStats = {
+                        gamesPlayed: (lifetime.gamesPlayed || 0) + 1,
+                        correct: (lifetime.correct || 0) + roundStats.correct,
+                        incorrect: (lifetime.incorrect || 0) + roundStats.incorrect,
+                        fastestTime:
+                            lifetime.fastestTime === null
+                                ? roundStats.fastestTime
+                                : Math.min(lifetime.fastestTime, roundStats.fastestTime),
+                        averageTime:
+                            lifetime.averageTime === null
+                                ? roundStats.averageTime
+                                : (lifetime.averageTime + roundStats.averageTime) / 2,
+                        streakBest: Math.max(lifetime.streakBest || 0, roundStats.streakBest || 0)
+                    };
+
+                    updateLifetimeStats(profileId, updatedStats)
+                        .then(() => console.log("Lifetime stats updated"))
+                        .catch(err => console.error("Error updating stats:", err));
+                }
+            });
+        }
+
+        // Build the single-player results screen
         const accuracy = (p.correct + p.incorrect > 0)
             ? ((p.correct / (p.correct + p.incorrect)) * 100).toFixed(1)
             : 0;
@@ -1902,7 +2436,6 @@ function endGameSinglePlayer() {
             ? p.avgTime.toFixed(1) + "s"
             : "0s";
 
-        // Build the single-player results screen
         document.getElementById("quiz").innerHTML = `
             <h2 style="text-align:center; font-size:2em; margin-bottom:20px;">
                 🏆 Final Results 🏆
@@ -1928,14 +2461,12 @@ function endGameSinglePlayer() {
             </div>
         `;
 
-        // Show buttons
         document.getElementById("controls").innerHTML = `
             <button onclick="startNewGame()">Play Again</button>
             <button onclick="backToMenu()">Back to Menu</button>
         `;
     });
 }
-
 function endGame() {
 	if (gameMode === "single") {
     return endGameSinglePlayer();
@@ -2114,7 +2645,200 @@ function fadeToBlack(callback) {
   }
 });
 
-	
+async function createPlayerProfile(name, avatar, color) {
+    const ref = doc(collection(window.db, "profiles")); // auto-ID
+    const profileData = {
+        name,
+        avatar,
+        color,
+        lifetimeStats: {
+            gamesPlayed: 0,
+            correct: 0,
+            incorrect: 0,
+            fastestTime: null,
+            averageTime: null,
+            streakBest: 0
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    };
+
+    await setDoc(ref, profileData);
+    return ref.id;
+}
+
+
+async function loadAllProfiles() {
+    const profilesCol = collection(window.db, "profiles");
+    const snapshot = await getDocs(profilesCol);
+
+    const profiles = [];
+    snapshot.forEach(doc => {
+        profiles.push({ id: doc.id, ...doc.data() });
+    });
+
+    return profiles;
+}
+
+async function loadProfile(profileId) {
+    const ref = doc(window.db, "profiles", profileId);
+    const snapshot = await getDoc(ref);
+
+    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+}
+
+async function loadAllAdmins() {
+    const adminsRef = collection(window.db, "admins");
+    const snapshot = await getDocs(adminsRef);
+    const admins = [];
+
+    snapshot.forEach(doc => {
+        admins.push({ id: doc.id, ...doc.data() });
+    });
+
+    return admins;
+}
+
+function isAdmin(profile) {
+  return profile.role === "admin";
+}
+
+function isDeveloper(profile) {
+  return profile.role === "developer";
+}
+
+async function showDeveloperDashboard() {
+    // Hide other screens
+    document.getElementById("screenMenu").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
+
+    const container = document.getElementById("profileSelectScreen");
+    container.style.display = "block";
+
+    // Load pending admin requests
+    const q = query(collection(window.db, "adminRequests"), where("approved", "==", false));
+    const snap = await getDocs(q);
+
+    let html = `
+        <h2 style="text-align:center;">Developer Dashboard</h2>
+        <h3 style="text-align:center; margin-top:-10px;">Pending Admin Requests</h3>
+        <div style="max-width:600px; margin:20px auto;">
+    `;
+
+    if (snap.empty) {
+        html += `<p style="text-align:center; opacity:0.7;">No pending requests.</p>`;
+    } else {
+        snap.forEach(docSnap => {
+            const r = docSnap.data();
+
+            html += `
+                <div style="
+                    border:1px solid #ccc;
+                    padding:15px;
+                    border-radius:8px;
+                    margin-bottom:15px;
+                    background:#fafafa;
+                ">
+                    <div style="font-size:2em;">${r.icon}</div>
+                    <h3>${r.groupName}</h3>
+                    <p><strong>Admin Name:</strong> ${r.adminName}</p>
+                    <p><strong>Contact:</strong> ${r.contact}</p>
+                    <p><strong>Location:</strong> ${r.location || "—"}</p>
+                    <p><strong>Description:</strong> ${r.description || "—"}</p>
+
+                    <button onclick="approveAdminRequest('${docSnap.id}', '${r.createdBy}')">
+                        Approve
+                    </button>
+                    <button onclick="denyAdminRequest('${docSnap.id}', '${r.createdBy}')">
+                        Deny
+                    </button>
+                </div>
+            `;
+        });
+    }
+
+    html += `
+        </div>
+        <div style="text-align:center;">
+            <button onclick="startMainMenu()">Back</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+async function approveAdminRequest(requestId, userUid) {
+    const reqRef = doc(window.db, "adminRequests", requestId);
+    const reqSnap = await getDoc(reqRef);
+
+    if (!reqSnap.exists()) {
+        alert("Request not found.");
+        return;
+    }
+
+    const r = reqSnap.data();
+
+    // 1. Update admin doc
+    await updateDoc(doc(window.db, "admins", userUid), {
+        role: "admin",
+        approved: true,
+        approvedAt: Date.now(),
+        approvedBy: window.DEVELOPER_UID
+    });
+
+    // 2. Update profile
+    await updateDoc(doc(window.db, "profiles", userUid), {
+        role: "admin",
+        updatedAt: Date.now()
+    });
+
+    // 3. Mark request approved
+    await updateDoc(reqRef, {
+        approved: true,
+        approvedAt: Date.now(),
+        approvedBy: window.DEVELOPER_UID
+    });
+
+    alert("Admin approved successfully.");
+    showDeveloperDashboard();
+}
+
+async function denyAdminRequest(requestId, userUid) {
+    const reqRef = doc(window.db, "adminRequests", requestId);
+
+    // 1. Mark request denied
+    await updateDoc(reqRef, {
+        approved: false,
+        denied: true,
+        deniedAt: Date.now(),
+        deniedBy: window.DEVELOPER_UID
+    });
+
+    // 2. Remove provisional admin doc
+    await deleteDoc(doc(window.db, "admins", userUid));
+
+    // 3. Convert profile back to normal member
+    await updateDoc(doc(window.db, "profiles", userUid), {
+        role: "member",
+        adminId: window.DEVELOPER_UID, // fallback
+        updatedAt: Date.now()
+    });
+
+    alert("Admin request denied.");
+    showDeveloperDashboard();
+}
+
+async function updateLifetimeStats(profileId, updates) {
+    const ref = doc(window.db, "profiles", profileId);
+
+    await updateDoc(ref, {
+        lifetimeStats: updates,
+        updatedAt: Date.now()
+    });
+}
+
 
 
 

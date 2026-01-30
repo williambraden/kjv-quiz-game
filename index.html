@@ -153,13 +153,26 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
 <body>
   <!-- Scoreboard always visible on menu -->
   <div id="scoreboard"></div>
+  
+  <!-- ========================================================= -->
+<!--  SCREEN 0: PROFILE SELECTION                              -->
+<!-- ========================================================= -->
+<div id="profileSelectScreen" style="display:none;"></div>
+  
 <!-- ========================================================= -->
 <!--  SCREEN 1: MAIN MENU                                      -->
 <!-- ========================================================= -->
 <div id="screenMenu">
   <h1>Bible Quiz</h1>
-
-
+<div id="activeProfileDisplay" style="
+    margin-bottom: 15px;
+    font-size: 20px;
+    text-align: center;
+"></div>
+<div style="text-align:center; margin-top:10px;">
+    <button onclick="switchProfile()">Switch Profile</button>
+    <button onclick="editProfile()">Edit Profile</button>
+</div>
 
   <!-- Mode Selector -->
   <div id="modeSelector">
@@ -168,6 +181,7 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
     <p>Select a mode above to begin.</p> 
 	 <button id="resetBtn" onclick="resetScores()">Reset Scores</button>
 	</div>
+	
 
   <!-- Main Menu Content -->
   <div id="menu">
@@ -313,6 +327,50 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
   pointer-events: none; transition: opacity 1s ease;
   z-index: 9999;
 "></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+  import {
+    getFirestore,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    setDoc,
+    updateDoc
+  } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+
+  // Make Firestore helpers available to quiz.js
+  window.collection = collection;
+  window.doc = doc;
+  window.getDoc = getDoc;
+  window.getDocs = getDocs;
+  window.setDoc = setDoc;
+  window.updateDoc = updateDoc;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCoS4UP2YNd3RG-5KEf6t1xr890MV2bG1A",
+    authDomain: "biblequizgame.firebaseapp.com",
+    projectId: "biblequizgame",
+    storageBucket: "biblequizgame.firebasestorage.app",
+    messagingSenderId: "165417801422",
+    appId: "1:165417801422:web:e07ba29e4b0f8cb3dde29f"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  signInAnonymously(auth)
+    .then(() => {
+      window.auth = auth;
+      window.db = db;
+
+      window.dispatchEvent(new Event("firebase-ready"));
+    })
+    .catch(err => console.error("Firebase Auth Error:", err));
+</script>
 
 <script src="quiz.js"></script>
 </body>
