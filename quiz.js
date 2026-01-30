@@ -240,6 +240,17 @@ function showScreen(id) {
 }
 
 
+document.getElementById("singlePlayerBtn").onclick = () => {
+    gameMode = "single";
+    showScreen("screenSingleOptions");
+};
+
+document.getElementById("localMultiplayerBtn").onclick = () => {
+    gameMode = "local-multiplayer";
+    showScreen("screenMultiOptions");
+};
+
+
 function startMainMenu() {
     // Hide all other screens
     document.getElementById("profileSelectScreen").style.display = "none";
