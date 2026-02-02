@@ -135,7 +135,6 @@ window.onload = function() {
     document.getElementById("timerInput").value = timerLength;
     document.getElementById("timerEnabled").checked = timerEnabled;
     document.getElementById("timeBonusCheckbox").checked = timeBonusEnabled;
-	document.getElementById("singlePlayerName").value = "Player 1";
 	
     // ⭐ Restore starting talents safely
     if (settings.startingTalents !== undefined) {
@@ -727,10 +726,20 @@ async function createProfileFromForm() {
 }
 
 
-function selectProfile(profileId) {
+async function selectProfile(profileId) {
+    // Load full profile from Firestore
+    const profile = await loadProfile(profileId);
+
+    // Save full profile locally
+    localStorage.setItem("selectedProfile", JSON.stringify(profile));
+
+    // Also save the ID if you still want it
     localStorage.setItem("selectedProfileId", profileId);
+
+    // Go to main menu or single-player options
     startMainMenu();
 }
+
 
 
 async function updateActiveProfileDisplay() {
@@ -776,9 +785,9 @@ async function updateActiveProfileDisplay() {
 
 function startSinglePlayerGame() {
 
-    // Read values directly from UI
-    let name = document.getElementById("singlePlayerName").value.trim();
-    if (!name) name = "Player 1";   // automatic default
+    // Get selected profile
+    const profile = JSON.parse(localStorage.getItem("selectedProfile"));
+    const name = profile ? profile.name : "Player";
 
     const rounds = parseInt(document.getElementById("singlePlayerRoundsInput").value);
     const quizTypeUI = document.getElementById("singlePlayerQuizType").value;
@@ -787,7 +796,7 @@ function startSinglePlayerGame() {
     const timeBonusUI = document.getElementById("singlePlayerTimeBonus").checked;
     const timerLengthUI = parseInt(document.getElementById("singlePlayerTimerLength").value);
 
-    // Store settings directly (no separate save button)
+    // Store settings
     singlePlayerSettings = {
         name,
         rounds,
@@ -798,11 +807,10 @@ function startSinglePlayerGame() {
         timerLength: timerLengthUI
     };
 
-    console.log("Single Player Settings:", singlePlayerSettings);
-
     // Initialize player object
     currentPlayer = {
         name,
+        profileId: profile.id,
         points: 0,
         correct: 0,
         incorrect: 0,
@@ -826,6 +834,7 @@ function startSinglePlayerGame() {
     showScreen("screenQuiz");
     startTrivia();
 }
+
 function saveOptions() {
 
   console.log("Checkbox state at saveOptions:", document.getElementById("timerEnabled").checked);
