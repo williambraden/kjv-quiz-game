@@ -15,11 +15,20 @@ window.addEventListener("firebase-ready", async () => {
     // Continue with your normal startup
     const profileId = localStorage.getItem("selectedProfileId");
 
+    // No profile selected → show profile selection
     if (!profileId) {
         showProfileSelection();
-    } else {
-        startMainMenu();
+        return;
     }
+
+    // Profile selected AND unlocked → go straight to main menu
+    if (isProfileUnlocked(profileId)) {
+        await finalizeProfileSelection(profileId);
+        return;
+    }
+
+    // Profile selected BUT not unlocked → show profile selection (NOT PIN)
+    showProfileSelection();
 });
 
 
@@ -104,6 +113,8 @@ let scrambledAlreadyChecked = false;
 let currentVerseWords = [];
 let currentScrambleAnswer = [];
 
+let sessionUnlockedProfileId = null;
+
 
 
 // Points are tracked per player object, so this array may not be needed
@@ -176,6 +187,18 @@ window.onload = function() {
   }
 };
 
+function isProfileUnlocked(profileId) {
+    return sessionStorage.getItem("profileUnlocked") === profileId;
+}
+
+function unlockProfileSession(profileId) {
+    sessionStorage.setItem("profileUnlocked", profileId);
+}
+
+function clearProfileUnlock() {
+    sessionStorage.removeItem("profileUnlocked");
+}
+
 window.addEventListener("DOMContentLoaded", () => {
     const rounds = parseInt(document.getElementById("roundsInput").value);
     const talentsSlider = document.getElementById("talentsInput");
@@ -226,6 +249,8 @@ function continueGame() {
 
 function showScreen(id) {
     const screens = [
+        "profileSelectScreen",
+        "profilePinScreen",
         "screenMenu",
         "screenSingleOptions",
         "screenMultiOptions",
@@ -251,18 +276,9 @@ document.getElementById("localMultiplayerBtn").onclick = () => {
 
 
 function startMainMenu() {
-    // Hide all other screens
-    document.getElementById("profileSelectScreen").style.display = "none";
-    document.getElementById("screenSingleOptions").style.display = "none";
-    document.getElementById("screenMultiOptions").style.display = "none";
-    document.getElementById("screenQuiz").style.display = "none";
-
-    // Show the existing menu HTML
-    const menu = document.getElementById("screenMenu");
-    menu.style.display = "block";
+    showScreen("screenMenu");
 
     // Add Developer Dashboard button if developer is logged in
-    // (but do NOT overwrite the menu)
     if (window.isDeveloper) {
         let existing = document.getElementById("developerDashboardBtn");
         if (!existing) {
@@ -271,12 +287,10 @@ function startMainMenu() {
             btn.textContent = "Developer Dashboard";
             btn.onclick = showDeveloperDashboard;
 
-            // Insert it under the mode selector
             document.getElementById("modeSelector").appendChild(btn);
         }
     }
 
-    // Update profile display
     updateActiveProfileDisplay();
 }
 
@@ -601,10 +615,19 @@ function showCreateProfileForm() {
 
             <label>Color (optional):</label><br>
             <input id="newProfileColor" placeholder="#4A90E2" style="width:100%; margin-bottom:20px;"><br>
-			<label>Choose Admin / Group:</label><br>
-			<select id="adminSelect" style="width:100%; margin-bottom:10px;">
-				<option value="">Loading admins...</option>
-			</select>
+
+            <label>Choose Admin / Group:</label><br>
+            <select id="adminSelect" style="width:100%; margin-bottom:20px;">
+                <option value="">Loading admins...</option>
+            </select>
+
+            <label>Choose a 4‑digit PIN:</label><br>
+            <input id="newProfilePin" type="password" maxlength="4"
+                   style="width:100%; font-size:20px; text-align:center; margin-bottom:10px;"><br>
+
+            <label>Confirm PIN:</label><br>
+            <input id="newProfilePinConfirm" type="password" maxlength="4"
+                   style="width:100%; font-size:20px; text-align:center; margin-bottom:20px;"><br>
 
             <button onclick="createProfileFromForm()" style="width:100%; margin-bottom:10px;">
                 Create Profile
@@ -615,7 +638,8 @@ function showCreateProfileForm() {
             </button>
         </div>
     `;
-	populateAdminDropdown();
+
+    populateAdminDropdown();
 }
 
 async function editProfile() {
@@ -699,48 +723,104 @@ async function saveProfileEdits(profileId) {
 
 async function createProfileFromForm() {
     const name = document.getElementById("newProfileName").value.trim();
-    const avatar = document.getElementById("newProfileAvatar").value.trim();
-    const color = document.getElementById("newProfileColor").value.trim();
-    const selectedAdminId = document.getElementById("adminSelect").value;
+    const avatar = document.getElementById("newProfileAvatar").value.trim() || "🙂";
+    const color = document.getElementById("newProfileColor").value.trim() || "#4A90E2";
+    const adminId = document.getElementById("adminSelect").value;
 
-    const profileId = crypto.randomUUID();
-    const ref = doc(window.db, "profiles", profileId);
+    const pin = document.getElementById("newProfilePin").value.trim();
+    const pinConfirm = document.getElementById("newProfilePinConfirm").value.trim();
 
-    // If no admin selected, assign to developer (for now)
-	const adminId =
-    selectedAdminId ||
-    (window.isDeveloper ? window.DEVELOPER_UID : window.DEVELOPER_UID);
+    if (!name) {
+        alert("Please enter a name.");
+        return;
+    }
 
-    await setDoc(ref, {
-        name,
-        avatar,
-        color,
-        role: "member",
-        adminId,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    });
+    if (!/^\d{4}$/.test(pin)) {
+        alert("PIN must be exactly 4 digits.");
+        return;
+    }
 
-    localStorage.setItem("selectedProfileId", profileId);
-    startMainMenu();
+    if (pin !== pinConfirm) {
+        alert("PINs do not match.");
+        return;
+    }
+
+    // Create the profile
+    const profileId = await createPlayerProfile(name, avatar, color, pin, adminId);
+
+    // Unlock for this session
+    sessionUnlockedProfileId = profileId;
+
+    // Go to main menu
+    await finalizeProfileSelection(profileId);
 }
 
 
 async function selectProfile(profileId) {
-    // Load full profile from Firestore
-    const profile = await loadProfile(profileId);
+    console.log("Selecting profile:", profileId);
 
-    // Save full profile locally
-    localStorage.setItem("selectedProfile", JSON.stringify(profile));
+    // If this profile is already unlocked this session, skip PIN
+    if (isProfileUnlocked(profileId)) {
+        console.log("Profile already unlocked this session.");
+        await finalizeProfileSelection(profileId);
+        return;
+    }
 
-    // Also save the ID if you still want it
-    localStorage.setItem("selectedProfileId", profileId);
-
-    // Go to main menu or single-player options
-    startMainMenu();
+    // Otherwise, show PIN screen
+    showPinEntryScreen(profileId);
 }
 
+async function finalizeProfileSelection(profileId) {
+    console.log("Finalizing profile selection:", profileId);
 
+    // Save selected profile for reloads
+    localStorage.setItem("selectedProfileId", profileId);
+
+    // Unlock this profile for the current session
+    unlockProfileSession(profileId);
+
+    // Load the profile from Firestore
+    const profile = await loadProfile(profileId);
+
+    if (!profile) {
+        console.error("Profile not found:", profileId);
+        showProfileSelection();
+        return;
+    }
+
+    // Store it globally so the rest of the app can use it
+    window.currentProfile = profile;
+
+    // Continue to main menu
+    startMainMenu(profileId);
+}
+
+function showPinEntryScreen(profileId) {
+    showScreen("profilePinScreen");
+
+    const screen = document.getElementById("profilePinScreen");
+    screen.dataset.profileId = profileId;
+}
+
+async function submitProfilePin() {
+    const screen = document.getElementById("profilePinScreen");
+    const profileId = screen.dataset.profileId;
+    const pin = document.getElementById("profilePinInput").value.trim();
+
+    const profile = await loadProfile(profileId);
+
+    if (!profile || !profile.pinHash) {
+        alert("Profile missing PIN.");
+        return;
+    }
+
+    if (hash(pin) === profile.pinHash) {
+        sessionUnlockedProfileId = profileId; // unlock for this session
+        await finalizeProfileSelection(profileId);
+    } else {
+        alert("Incorrect PIN.");
+    }
+}
 
 async function updateActiveProfileDisplay() {
     const profileId = localStorage.getItem("selectedProfileId");
@@ -2665,12 +2745,20 @@ function fadeToBlack(callback) {
   }
 });
 
-async function createPlayerProfile(name, avatar, color) {
-    const ref = doc(collection(window.db, "profiles")); // auto-ID
+async function createPlayerProfile(name, avatar, color, pin, adminId) {
+    const ref = doc(collection(window.db, "profiles"));
+
+    const pinHash = btoa(pin);
+
     const profileData = {
         name,
         avatar,
         color,
+        pinHash,
+        ownerType: "pin",
+        role: "member",        // ⭐ restored role
+        adminId: adminId || null,
+
         lifetimeStats: {
             gamesPlayed: 0,
             correct: 0,
@@ -2679,6 +2767,7 @@ async function createPlayerProfile(name, avatar, color) {
             averageTime: null,
             streakBest: 0
         },
+
         createdAt: Date.now(),
         updatedAt: Date.now()
     };
@@ -2687,6 +2776,9 @@ async function createPlayerProfile(name, avatar, color) {
     return ref.id;
 }
 
+function hash(str) {
+    return btoa(str); // not secure, but works for testing
+}
 
 async function loadAllProfiles() {
     const profilesCol = collection(window.db, "profiles");
@@ -2850,12 +2942,13 @@ async function denyAdminRequest(requestId, userUid) {
     showDeveloperDashboard();
 }
 
-async function updateLifetimeStats(profileId, updates) {
+async function updateLifetimeStats(profileId, updates, pinHash) {
     const ref = doc(window.db, "profiles", profileId);
 
     await updateDoc(ref, {
         lifetimeStats: updates,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        pinHashProvided: pinHash
     });
 }
 

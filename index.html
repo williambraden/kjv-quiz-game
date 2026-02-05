@@ -158,6 +158,19 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
 <!--  SCREEN 0: PROFILE SELECTION                              -->
 <!-- ========================================================= -->
 <div id="profileSelectScreen" style="display:none;"></div>
+
+<!-- ========================================================= -->
+<!--  SCREEN 0.5: PROFILE PIN ENTRY                            -->
+<!-- ========================================================= -->
+<div id="profilePinScreen" style="display:none; text-align:center; padding:20px;">
+    <h2>Enter PIN</h2>
+    <input id="profilePinInput" type="password" maxlength="4" style="font-size:24px; text-align:center;">
+    <br><br>
+    <button onclick="submitProfilePin()">Unlock</button>
+    <button onclick="switchProfile()">Back</button>
+</div>
+
+
   
 <!-- ========================================================= -->
 <!--  SCREEN 1: MAIN MENU                                      -->

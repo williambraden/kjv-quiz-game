@@ -1,19 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Developer Dashboard</title>
+
     <style>
         body {
             font-family: Arial, sans-serif;
             padding: 20px;
             background: #f5f5f5;
         }
+
         h1 {
             margin-bottom: 10px;
         }
+
         #tabs {
             margin-bottom: 15px;
         }
+
         #tabs button {
             margin-right: 8px;
             padding: 8px 12px;
@@ -22,17 +27,21 @@
             background: #fff;
             cursor: pointer;
         }
+
         #tabs button.active {
             background: #0078d4;
             color: #fff;
             border-color: #0078d4;
         }
+
         .tabContent {
             display: none;
         }
+
         .tabContent.active {
             display: block;
         }
+
         .card {
             border: 1px solid #ddd;
             padding: 12px;
@@ -40,85 +49,147 @@
             margin-bottom: 10px;
             background: #fff;
         }
+
         .card h3 {
             margin: 4px 0;
         }
+
         .card p {
             margin: 2px 0;
         }
+
         .card button {
             margin-right: 6px;
             margin-top: 6px;
         }
+
         .flex-row {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
         }
+
         .flex-row > div {
             flex: 1 1 250px;
         }
+
         label {
             display: block;
             margin-top: 6px;
             font-size: 0.9em;
         }
+
         input, select, textarea {
             width: 100%;
             padding: 4px 6px;
             margin-top: 2px;
             box-sizing: border-box;
         }
+
         textarea {
             resize: vertical;
         }
+
         .small {
             font-size: 0.85em;
             color: #555;
         }
+
+        /* Modal (for upcoming Profile Editor) */
+        #modalOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        #modalBox {
+            background: #fff;
+            padding: 20px;
+            width: 450px;
+            max-width: 90%;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+
+        #modalBox h2 {
+            margin-top: 0;
+        }
+
+        #modalClose {
+            float: right;
+            cursor: pointer;
+            font-size: 1.2em;
+            margin-top: -10px;
+        }
     </style>
 </head>
+
 <body>
 
 <h1>Developer Dashboard</h1>
-<p class="small">Developer-only tools for managing admins, groups, and members.</p>
+<p class="small">Developer-only tools for managing admins, groups, members, and profiles.</p>
 
+<!-- Tabs -->
 <div id="tabs">
     <button data-tab="pendingTab" class="active">Pending Requests</button>
     <button data-tab="adminsTab">Admins</button>
     <button data-tab="groupsTab">Groups</button>
     <button data-tab="membersTab">Members</button>
+    <button data-tab="profilesTab">Profiles</button>
     <button data-tab="toolsTab">Tools</button>
 </div>
 
+<!-- Pending Requests -->
 <div id="pendingTab" class="tabContent active">
     <h2>Pending Admin Requests</h2>
     <div id="pendingRequestsContainer">Loading...</div>
 </div>
 
+<!-- Admins -->
 <div id="adminsTab" class="tabContent">
     <h2>Admins</h2>
     <div id="adminsContainer">Loading...</div>
 </div>
 
+<!-- Groups -->
 <div id="groupsTab" class="tabContent">
     <h2>Groups</h2>
     <div id="groupsContainer">Loading...</div>
 </div>
 
+<!-- Members -->
 <div id="membersTab" class="tabContent">
     <h2>Members</h2>
-    <div>
-        <label>Filter by Admin (Group Owner)</label>
-        <select id="memberAdminFilter">
-            <option value="">All admins</option>
-        </select>
-    </div>
+
+    <label>Filter by Admin (Group Owner)</label>
+    <select id="memberAdminFilter">
+        <option value="">All admins</option>
+    </select>
+
     <div id="membersContainer" style="margin-top:10px;">Loading...</div>
 </div>
 
+<!-- Profiles (NEW TAB) -->
+<div id="profilesTab" class="tabContent">
+    <h2>Profiles</h2>
+
+    <label>Search Profiles</label>
+    <input id="profileSearchInput" placeholder="Search by name, UID, or adminId">
+
+    <div id="profilesContainer" style="margin-top:10px;">Loading...</div>
+</div>
+
+<!-- Tools -->
 <div id="toolsTab" class="tabContent">
     <h2>Tools</h2>
+
     <div class="card">
         <h3>Reset Member Lifetime Stats</h3>
         <p class="small">Set all lifetimeStats fields to zero/null for a specific member.</p>
@@ -132,548 +203,24 @@
         <p class="small">Use with care. This will reset stats for all profiles.</p>
         <button id="resetAllStatsBtn">Reset All Stats</button>
     </div>
+
+    <div class="card">
+        <h3>Fix Missing Fields</h3>
+        <p class="small">Adds missing role, ownerType, adminId, or lifetimeStats fields.</p>
+        <button id="fixMissingFieldsBtn">Fix All Profiles</button>
+    </div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { 
-    getAuth, onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { 
-    getFirestore, collection, query, where, getDocs, doc, getDoc,
-    updateDoc, deleteDoc 
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-// TODO: fill in your config
-const firebaseConfig = {
-    apiKey: "AIzaSyCoS4UP2YNd3RG-5KEf6t1xr890MV2bG1A",
-    authDomain: "biblequizgame.firebaseapp.com",
-    projectId: "biblequizgame",
-    storageBucket: "biblequizgame.firebasestorage.app",
-    messagingSenderId: "165417801422",
-    appId: "1:165417801422:web:e07ba29e4b0f8cb3dde29f"
-  };
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// Your developer UID
-const DEVELOPER_UID = "QANElecfZHe2n1BmtQ39Q7E9bNu1";
-
-// ---------- Tab handling ----------
-const tabButtons = document.querySelectorAll("#tabs button");
-const tabContents = document.querySelectorAll(".tabContent");
-
-tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-        const tabId = btn.getAttribute("data-tab");
-        tabButtons.forEach(b => b.classList.remove("active"));
-        tabContents.forEach(c => c.classList.remove("active"));
-        btn.classList.add("active");
-        document.getElementById(tabId).classList.add("active");
-    });
-});
-
-// ---------- Auth gate ----------
-onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-        alert("Not signed in. Redirecting to admin login.");
-        window.location.href = "admin-login.html";
-        return;
-    }
-
-    if (user.uid !== DEVELOPER_UID) {
-        alert("Access denied. You are not the developer.");
-        window.location.href = "index.html";
-        return;
-    }
-
-    // Load all dashboard data
-    await Promise.all([
-        loadPendingRequests(),
-        loadAdmins(),
-        loadGroups(),
-        loadMembers(),
-    ]);
-
-    setupTools();
-});
-
-// ---------- Pending Requests ----------
-async function loadPendingRequests() {
-    const container = document.getElementById("pendingRequestsContainer");
-    container.innerHTML = "Loading...";
-
-    const qReq = query(collection(db, "adminRequests"), where("approved", "==", false));
-    const snap = await getDocs(qReq);
-
-    if (snap.empty) {
-        container.innerHTML = "<p>No pending requests.</p>";
-        return;
-    }
-
-    container.innerHTML = "";
-    snap.forEach(docSnap => {
-        const r = docSnap.data();
-        const id = docSnap.id;
-
-        const card = document.createElement("div");
-        card.className = "card";
-
-        card.innerHTML = `
-            <div style="font-size:2em;">${r.icon || "👤"}</div>
-            <h3>${r.groupName || "(No group name)"}</h3>
-            <p><strong>Admin Name:</strong> ${r.adminName || "—"}</p>
-            <p><strong>Contact:</strong> ${r.contact || "—"}</p>
-            <p><strong>Location:</strong> ${r.location || "—"}</p>
-            <p><strong>Description:</strong> ${r.description || "—"}</p>
-            <p class="small"><strong>Created By UID:</strong> ${r.createdBy || "—"}</p>
-        `;
-
-        const approveBtn = document.createElement("button");
-        approveBtn.textContent = "Approve";
-        approveBtn.onclick = () => approveAdminRequest(id, r.createdBy, r);
-
-        const denyBtn = document.createElement("button");
-        denyBtn.textContent = "Deny";
-        denyBtn.onclick = () => denyAdminRequest(id, r.createdBy);
-
-        card.appendChild(approveBtn);
-        card.appendChild(denyBtn);
-
-        container.appendChild(card);
-    });
-}
-
-async function approveAdminRequest(requestId, userUid, requestData) {
-    if (!userUid) {
-        alert("Request has no createdBy UID. Cannot approve.");
-        return;
-    }
-
-    // Promote in admins collection
-    const adminRef = doc(db, "admins", userUid);
-    const adminSnap = await getDoc(adminRef);
-
-    if (!adminSnap.exists()) {
-        // Create admin doc if missing
-        await updateDocOrCreate(adminRef, {
-            groupName: requestData.groupName || "",
-            adminName: requestData.adminName || "",
-            contact: requestData.contact || "",
-            icon: requestData.icon || "👤",
-            description: requestData.description || "",
-            role: "admin",
-            approved: true,
-            approvedAt: Date.now(),
-            approvedBy: DEVELOPER_UID
-        });
-    } else {
-        await updateDoc(adminRef, {
-            role: "admin",
-            approved: true,
-            approvedAt: Date.now(),
-            approvedBy: DEVELOPER_UID
-        });
-    }
-
-    // Update profile role/adminId
-    const profileRef = doc(db, "profiles", userUid);
-    const profileSnap = await getDoc(profileRef);
-    if (profileSnap.exists()) {
-        await updateDoc(profileRef, {
-            role: "admin",
-            adminId: userUid,
-            updatedAt: Date.now()
-        });
-    }
-
-    // Mark request as approved
-    const reqRef = doc(db, "adminRequests", requestId);
-    await updateDoc(reqRef, {
-        approved: true,
-        approvedAt: Date.now(),
-        approvedBy: DEVELOPER_UID
-    });
-
-    alert("Admin approved.");
-    await loadPendingRequests();
-    await loadAdmins();
-    await loadGroups();
-}
-
-async function denyAdminRequest(requestId, userUid) {
-    const reqRef = doc(db, "adminRequests", requestId);
-    await updateDoc(reqRef, {
-        approved: false,
-        denied: true,
-        deniedAt: Date.now(),
-        deniedBy: DEVELOPER_UID
-    });
-
-    // Optionally clean up admin doc
-    if (userUid) {
-        const adminRef = doc(db, "admins", userUid);
-        const adminSnap = await getDoc(adminRef);
-        if (adminSnap.exists()) {
-            await deleteDoc(adminRef);
-        }
-
-        const profileRef = doc(db, "profiles", userUid);
-        const profileSnap = await getDoc(profileRef);
-        if (profileSnap.exists()) {
-            await updateDoc(profileRef, {
-                role: "member",
-                updatedAt: Date.now()
-            });
-        }
-    }
-
-    alert("Admin request denied.");
-    await loadPendingRequests();
-    await loadAdmins();
-    await loadGroups();
-}
-
-// Helper: update or create
-async function updateDocOrCreate(ref, data) {
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-        await updateDoc(ref, data);
-    } else {
-        // Firestore doesn't have setDoc imported here; you can add it if needed.
-        // For now, we assume admin doc exists or you add setDoc import + call.
-        console.warn("Admin doc missing; consider using setDoc here.");
-    }
-}
-
-// ---------- Admins ----------
-async function loadAdmins() {
-    const container = document.getElementById("adminsContainer");
-    container.innerHTML = "Loading...";
-
-    const snap = await getDocs(collection(db, "admins"));
-    if (snap.empty) {
-        container.innerHTML = "<p>No admins found.</p>";
-        return;
-    }
-
-    container.innerHTML = "";
-    snap.forEach(docSnap => {
-        const a = docSnap.data();
-        const uid = docSnap.id;
-
-        const card = document.createElement("div");
-        card.className = "card";
-
-        card.innerHTML = `
-            <div style="font-size:2em;">${a.icon || "👤"}</div>
-            <h3>${a.groupName || "(No group name)"}</h3>
-            <p><strong>Admin Name:</strong> ${a.adminName || "—"}</p>
-            <p><strong>Contact:</strong> ${a.contact || "—"}</p>
-            <p><strong>Role:</strong> ${a.role || "—"}</p>
-            <p class="small"><strong>Admin UID:</strong> ${uid}</p>
-        `;
-
-        const editBtn = document.createElement("button");
-        editBtn.textContent = "Edit Group Info";
-        editBtn.onclick = () => editAdminGroupInfo(uid, a);
-
-        const resetPinBtn = document.createElement("button");
-        resetPinBtn.textContent = "Reset PIN (manual)";
-        resetPinBtn.onclick = () => {
-            alert("Implement PIN reset flow here (e.g., set new pinHash).");
-        };
-
-        const viewMembersBtn = document.createElement("button");
-        viewMembersBtn.textContent = "View Members";
-        viewMembersBtn.onclick = () => {
-            // Switch to Members tab and filter
-            document.querySelector('#tabs button[data-tab="membersTab"]').click();
-            const filter = document.getElementById("memberAdminFilter");
-            filter.value = uid;
-            loadMembers();
-        };
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete Admin";
-        deleteBtn.onclick = () => deleteAdmin(uid);
-
-        card.appendChild(editBtn);
-        card.appendChild(resetPinBtn);
-        card.appendChild(viewMembersBtn);
-        card.appendChild(deleteBtn);
-
-        container.appendChild(card);
-    });
-
-    // Also populate member admin filter
-    await populateMemberAdminFilter();
-}
-
-async function editAdminGroupInfo(adminUid, adminData) {
-    const newName = prompt("New group name:", adminData.groupName || "");
-    if (newName === null) return;
-
-    const newContact = prompt("New contact:", adminData.contact || "");
-    if (newContact === null) return;
-
-    const newDesc = prompt("New description:", adminData.description || "");
-    if (newDesc === null) return;
-
-    await updateDoc(doc(db, "admins", adminUid), {
-        groupName: newName,
-        contact: newContact,
-        description: newDesc,
-        updatedAt: Date.now()
-    });
-
-    alert("Group info updated.");
-    await loadAdmins();
-    await loadGroups();
-}
-
-async function deleteAdmin(adminUid) {
-    const confirmDelete = confirm(
-        "Delete this admin? Members will still reference this adminId unless you reassign them manually."
-    );
-    if (!confirmDelete) return;
-
-    await deleteDoc(doc(db, "admins", adminUid));
-
-    // Optionally downgrade profile
-    const profileRef = doc(db, "profiles", adminUid);
-    const profileSnap = await getDoc(profileRef);
-    if (profileSnap.exists()) {
-        await updateDoc(profileRef, {
-            role: "member",
-            updatedAt: Date.now()
-        });
-    }
-
-    alert("Admin deleted.");
-    await loadAdmins();
-    await loadGroups();
-    await loadMembers();
-}
-
-// ---------- Groups (derived from admins) ----------
-async function loadGroups() {
-    const container = document.getElementById("groupsContainer");
-    container.innerHTML = "Loading...";
-
-    const snap = await getDocs(collection(db, "admins"));
-    if (snap.empty) {
-        container.innerHTML = "<p>No groups found.</p>";
-        return;
-    }
-
-    container.innerHTML = "";
-    const admins = [];
-    snap.forEach(docSnap => {
-        admins.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    for (const admin of admins) {
-        const card = document.createElement("div");
-        card.className = "card";
-
-        // Count members
-        const qMembers = query(
-            collection(db, "profiles"),
-            where("adminId", "==", admin.id)
-        );
-        const membersSnap = await getDocs(qMembers);
-        const memberCount = membersSnap.size;
-
-        card.innerHTML = `
-            <div style="font-size:2em;">${admin.icon || "👤"}</div>
-            <h3>${admin.groupName || "(No group name)"}</h3>
-            <p><strong>Admin Name:</strong> ${admin.adminName || "—"}</p>
-            <p><strong>Members:</strong> ${memberCount}</p>
-            <p class="small"><strong>Admin UID:</strong> ${admin.id}</p>
-        `;
-
-        const viewMembersBtn = document.createElement("button");
-        viewMembersBtn.textContent = "View Members";
-        viewMembersBtn.onclick = () => {
-            document.querySelector('#tabs button[data-tab="membersTab"]').click();
-            const filter = document.getElementById("memberAdminFilter");
-            filter.value = admin.id;
-            loadMembers();
-        };
-
-        card.appendChild(viewMembersBtn);
-        container.appendChild(card);
-    }
-}
-
-// ---------- Members ----------
-async function populateMemberAdminFilter() {
-    const select = document.getElementById("memberAdminFilter");
-    // Clear except "All admins"
-    select.innerHTML = '<option value="">All admins</option>';
-
-    const snap = await getDocs(collection(db, "admins"));
-    snap.forEach(docSnap => {
-        const a = docSnap.data();
-        const opt = document.createElement("option");
-        opt.value = docSnap.id;
-        opt.textContent = a.groupName ? `${a.groupName} (${docSnap.id})` : docSnap.id;
-        select.appendChild(opt);
-    });
-
-    select.onchange = () => loadMembers();
-}
-
-async function loadMembers() {
-    const container = document.getElementById("membersContainer");
-    container.innerHTML = "Loading...";
-
-    const filterAdminId = document.getElementById("memberAdminFilter").value;
-
-    let qProfiles;
-    if (filterAdminId) {
-        qProfiles = query(
-            collection(db, "profiles"),
-            where("adminId", "==", filterAdminId)
-        );
-    } else {
-        qProfiles = collection(db, "profiles");
-    }
-
-    const snap = await getDocs(qProfiles);
-    if (snap.empty) {
-        container.innerHTML = "<p>No members found.</p>";
-        return;
-    }
-
-    container.innerHTML = "";
-    snap.forEach(docSnap => {
-        const p = docSnap.data();
-        const uid = docSnap.id;
-
-        const card = document.createElement("div");
-        card.className = "card";
-
-        card.innerHTML = `
-            <h3>${p.name || "(No name)"} ${p.role === "admin" ? "⭐" : ""}</h3>
-            <p><strong>Role:</strong> ${p.role || "—"}</p>
-            <p><strong>AdminId:</strong> ${p.adminId || "—"}</p>
-            <p><strong>Games Played:</strong> ${p.lifetimeStats?.gamesPlayed ?? p.gamesPlayed ?? 0}</p>
-            <p><strong>Correct:</strong> ${p.lifetimeStats?.correct ?? p.correct ?? 0}</p>
-            <p><strong>Incorrect:</strong> ${p.lifetimeStats?.incorrect ?? p.incorrect ?? 0}</p>
-            <p class="small"><strong>Profile UID:</strong> ${uid}</p>
-        `;
-
-        const reassignBtn = document.createElement("button");
-        reassignBtn.textContent = "Reassign to Admin";
-        reassignBtn.onclick = () => reassignMember(uid, p);
-
-        const resetStatsBtn = document.createElement("button");
-        resetStatsBtn.textContent = "Reset Stats";
-        resetStatsBtn.onclick = () => resetMemberStats(uid);
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete Member";
-        deleteBtn.onclick = () => deleteMember(uid);
-
-        card.appendChild(reassignBtn);
-        card.appendChild(resetStatsBtn);
-        card.appendChild(deleteBtn);
-
-        container.appendChild(card);
-    });
-}
-
-async function reassignMember(profileUid, profileData) {
-    const newAdminId = prompt("New admin UID for this member:", profileData.adminId || "");
-    if (!newAdminId) return;
-
-    await updateDoc(doc(db, "profiles", profileUid), {
-        adminId: newAdminId,
-        updatedAt: Date.now()
-    });
-
-    alert("Member reassigned.");
-    await loadMembers();
-    await loadGroups();
-}
-
-async function resetMemberStats(profileUid) {
-    const confirmReset = confirm("Reset this member's lifetime stats?");
-    if (!confirmReset) return;
-
-    const profileRef = doc(db, "profiles", profileUid);
-    const profileSnap = await getDoc(profileRef);
-    if (!profileSnap.exists()) {
-        alert("Profile not found.");
-        return;
-    }
-
-    const data = profileSnap.data();
-    const lifetimeStats = data.lifetimeStats || {};
-
-    const resetStats = {
-        ...lifetimeStats,
-        correct: 0,
-        incorrect: 0,
-        gamesPlayed: 0,
-        averageTime: null,
-        fastestTime: null,
-        streakBest: 0
-    };
-
-    await updateDoc(profileRef, {
-        lifetimeStats: resetStats,
-        updatedAt: Date.now()
-    });
-
-    alert("Member stats reset.");
-    await loadMembers();
-}
-
-// Delete member
-async function deleteMember(profileUid) {
-    const confirmDelete = confirm("Delete this member profile?");
-    if (!confirmDelete) return;
-
-    await deleteDoc(doc(db, "profiles", profileUid));
-    alert("Member deleted.");
-    await loadMembers();
-    await loadGroups();
-}
-
-// ---------- Tools ----------
-function setupTools() {
-    const resetMemberBtn = document.getElementById("resetMemberStatsBtn");
-    const resetAllBtn = document.getElementById("resetAllStatsBtn");
-
-    resetMemberBtn.onclick = async () => {
-        const uid = document.getElementById("resetMemberUid").value.trim();
-        if (!uid) {
-            alert("Enter a profile UID.");
-            return;
-        }
-        await resetMemberStats(uid);
-    };
-
-    resetAllBtn.onclick = async () => {
-        const confirmAll = confirm("Reset stats for ALL members? This cannot be undone.");
-        if (!confirmAll) return;
-
-        const snap = await getDocs(collection(db, "profiles"));
-        for (const docSnap of snap.docs) {
-            const uid = docSnap.id;
-            await resetMemberStats(uid);
-        }
-
-        alert("All member stats reset.");
-        await loadMembers();
-    };
-}
-</script>
+<!-- Modal (used for Profile Editor, Admin Editor, etc.) -->
+<div id="modalOverlay">
+    <div id="modalBox">
+        <span id="modalClose">✖</span>
+        <div id="modalContent"></div>
+    </div>
+</div>
+
+<!-- External JS -->
+<script type="module" src="developer-dashboard.js"></script>
 
 </body>
 </html>
