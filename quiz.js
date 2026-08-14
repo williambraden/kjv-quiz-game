@@ -264,9 +264,19 @@ function showScreen(id) {
 
 
 document.getElementById("singlePlayerBtn").onclick = () => {
+    const profileJson = localStorage.getItem("selectedProfile");
+
+    if (!profileJson) {
+        // No profile selected → force profile selection screen
+        switchProfile();
+        return;
+    }
+
+    // Profile exists → go to single player options
     gameMode = "single";
     showScreen("screenSingleOptions");
 };
+
 
 document.getElementById("localMultiplayerBtn").onclick = () => {
     gameMode = "local-multiplayer";
