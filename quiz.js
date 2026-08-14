@@ -1028,6 +1028,7 @@ function startLocalMultiplayerGame() {
 
     // Load settings
     totalRounds = parseInt(document.getElementById("roundsInput").value);
+	rounds = totalRounds;
     currentRound = 1;
 
     quizType = document.getElementById("quizType").value;
