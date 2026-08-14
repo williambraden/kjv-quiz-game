@@ -73,7 +73,6 @@ const newTestamentBooks = [
 let gameMode = null; 
 // "single" or "local-multiplayer"
 let singlePlayerSettings = null;
-let totalRounds = 3;
 let currentRound = 1;
 
 let rounds = 3;
@@ -901,7 +900,6 @@ function startSinglePlayerGame() {
     };
 
     // Apply settings globally
-    totalRounds = rounds;
     currentRound = 1;
     quizType = quizTypeUI;
     testament = testamentUI;
@@ -1027,8 +1025,7 @@ function startLocalMultiplayerGame() {
     }
 
     // Load settings
-    totalRounds = parseInt(document.getElementById("roundsInput").value);
-	rounds = totalRounds;
+    rounds = parseInt(document.getElementById("roundsInput").value);
     currentRound = 1;
 
     quizType = document.getElementById("quizType").value;
@@ -1147,7 +1144,7 @@ async function runQuiz() {
 
     // UI: progress + turn
     document.getElementById("progress").innerHTML =
-        `Round ${roundIndex} of ${totalRounds}<br>
+        `Round ${roundIndex} of ${rounds}<br>
          <em>Round Type: ${
             typeToUse === "multiple" ? "Guess the Book" :
             typeToUse === "fill" ? "Fill in the Blank" :
