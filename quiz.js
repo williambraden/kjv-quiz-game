@@ -32,37 +32,7 @@ window.addEventListener("firebase-ready", async () => {
 });
 
 
-// ==============================
-// 📚 Bible Book Lists
-// ==============================
-
 console.log("SCRIPT LOADED");
-
-const books = [
-  "Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth",
-  "1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah","Esther",
-  "Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah","Lamentations",
-  "Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah","Nahum","Habakkuk","Zephaniah",
-  "Haggai","Zechariah","Malachi","Matthew","Mark","Luke","John","Acts","Romans","1 Corinthians",
-  "2 Corinthians","Galatians","Ephesians","Philippians","Colossians","1 Thessalonians","2 Thessalonians",
-  "1 Timothy","2 Timothy","Titus","Philemon","Hebrews","James","1 Peter","2 Peter","1 John","2 John",
-  "3 John","Jude","Revelation"
-];
-
-const oldTestamentBooks = [
-  "Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth",
-  "1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah","Esther",
-  "Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah","Lamentations",
-  "Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah","Nahum","Habakkuk","Zephaniah",
-  "Haggai","Zechariah","Malachi"
-];
-
-const newTestamentBooks = [
-  "Matthew","Mark","Luke","John","Acts","Romans","1 Corinthians",
-  "2 Corinthians","Galatians","Ephesians","Philippians","Colossians","1 Thessalonians","2 Thessalonians",
-  "1 Timothy","2 Timothy","Titus","Philemon","Hebrews","James","1 Peter","2 Peter","1 John","2 John",
-  "3 John","Jude","Revelation"
-];
 
 
 
@@ -73,6 +43,7 @@ const newTestamentBooks = [
 let gameMode = null; 
 // "single" or "local-multiplayer"
 let singlePlayerSettings = null;
+let totalRounds = 3;
 let currentRound = 1;
 
 let rounds = 3;
@@ -113,11 +84,31 @@ let currentVerseWords = [];
 let currentScrambleAnswer = [];
 
 let sessionUnlockedProfileId = null;
+let availableProfiles = [];
 
 
 
 // Points are tracked per player object, so this array may not be needed
 // but if you want a separate points array, initialize it after players are set
+
+function normalizeLocalPlayers(savedPlayers, startingTalents = 3) {
+    return (Array.isArray(savedPlayers) ? savedPlayers : []).map(player => {
+        const talents = player.talents || {};
+        const starting = Number(talents.starting ?? startingTalents);
+
+        return {
+            ...player,
+            talents: {
+                starting,
+                current: Number(talents.current ?? starting),
+                gained: Number(talents.gained ?? 0),
+                wasted: Number(talents.wasted ?? 0),
+                redemptions: Number(talents.redemptions ?? 0),
+                redemptionsSuccessful: Number(talents.redemptionsSuccessful ?? 0)
+            }
+        };
+    });
+}
 
 window.onload = function() {
 
@@ -129,7 +120,7 @@ window.onload = function() {
     rounds = settings.rounds;
     quizType = settings.quizType;
     timerLength = settings.timerLength;
-    players = settings.players;
+    players = normalizeLocalPlayers(settings.players, Number(settings.startingTalents ?? 3));
     testament = settings.testament || "both";
 
     timerEnabled = Boolean(settings.timerEnabled);
@@ -163,7 +154,9 @@ window.onload = function() {
     rounds = 3;
     quizType = "mixed";
     timerLength = 30;
-    players = [{ name: "Player 1", correct: 0, incorrect: 0, points: 0 }];
+        players = normalizeLocalPlayers([
+            { name: "Player 1", correct: 0, incorrect: 0, points: 0 }
+        ]);
     testament = "both";
     timerEnabled = true;
     timeBonusEnabled = true;
@@ -219,7 +212,7 @@ function continueGame() {
     rounds = settings.rounds;
     quizType = settings.quizType;
     timerLength = settings.timerLength;
-    players = settings.players;
+    players = normalizeLocalPlayers(settings.players, Number(settings.startingTalents ?? 3));
     testament = settings.testament;
 
     timerEnabled = Boolean(settings.timerEnabled);
@@ -245,64 +238,6 @@ function continueGame() {
     runQuiz();
   }
 }
-
-function showScreen(id) {
-    const screens = [
-        "profileSelectScreen",
-        "profilePinScreen",
-        "screenMenu",
-        "screenSingleOptions",
-        "screenMultiOptions",
-        "screenQuiz"
-    ];
-
-    screens.forEach(screen => {
-        document.getElementById(screen).style.display =
-            (screen === id) ? "block" : "none";
-    });
-}
-
-
-document.getElementById("singlePlayerBtn").onclick = () => {
-    const profileJson = localStorage.getItem("selectedProfile");
-
-    if (!profileJson) {
-        // No profile selected → force profile selection screen
-        switchProfile();
-        return;
-    }
-
-    // Profile exists → go to single player options
-    gameMode = "single";
-    showScreen("screenSingleOptions");
-};
-
-
-document.getElementById("localMultiplayerBtn").onclick = () => {
-    gameMode = "local-multiplayer";
-    showScreen("screenMultiOptions");
-};
-
-
-function startMainMenu() {
-    showScreen("screenMenu");
-
-    // Add Developer Dashboard button if developer is logged in
-    if (window.isDeveloper) {
-        let existing = document.getElementById("developerDashboardBtn");
-        if (!existing) {
-            const btn = document.createElement("button");
-            btn.id = "developerDashboardBtn";
-            btn.textContent = "Developer Dashboard";
-            btn.onclick = showDeveloperDashboard;
-
-            document.getElementById("modeSelector").appendChild(btn);
-        }
-    }
-
-    updateActiveProfileDisplay();
-}
-
 
 document.getElementById("roundsInput").addEventListener("input", function () {
     const rounds = parseInt(this.value);
@@ -330,6 +265,24 @@ function switchProfile() {
     showProfileSelection();
 }
 
+function normalizeProfileName(name) {
+    return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function rememberProfileOnDevice(profileId) {
+    const rememberedIds = JSON.parse(localStorage.getItem("rememberedProfileIds") || "[]");
+    if (!rememberedIds.includes(profileId)) {
+        rememberedIds.push(profileId);
+        localStorage.setItem("rememberedProfileIds", JSON.stringify(rememberedIds));
+    }
+}
+
+async function loadRememberedProfiles() {
+    const rememberedIds = JSON.parse(localStorage.getItem("rememberedProfileIds") || "[]");
+    const profiles = await Promise.all(rememberedIds.map(profileId => loadProfile(profileId)));
+    return profiles.filter(Boolean);
+}
+
 async function showProfileSelection() {
     // Hide all other screens
     document.getElementById("screenMenu").style.display = "none";
@@ -341,8 +294,9 @@ async function showProfileSelection() {
     const container = document.getElementById("profileSelectScreen");
     container.style.display = "block";
 
-    // Load all profiles from Firestore
-    const profiles = await loadAllProfiles();
+    // Load only profiles previously used on this device
+    const profiles = await loadRememberedProfiles();
+    availableProfiles = profiles;
 
     // Build the UI
     let html = `
@@ -358,18 +312,20 @@ async function showProfileSelection() {
 
     profiles.forEach(p => {
         html += `
-            <div onclick="selectProfile('${p.id}')" style="
+            <div style="
                 padding:15px;
                 border:1px solid #ccc;
                 border-radius:8px;
-                cursor:pointer;
-                width:150px;
+                width:170px;
                 background:#f9f9f9;
                 text-align:center;
                 transition:0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                <div style="font-size:2em;">${p.avatar || "🙂"}</div>
-                <h3 style="margin:10px 0 5px 0;">${p.name}</h3>
+            " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <div onclick="selectProfile('${p.id}')" style="cursor:pointer;">
+                    <div style="font-size:2em;">${p.avatar || "🙂"}</div>
+                    <h3 style="margin:10px 0 5px 0;">${p.name}</h3>
+                </div>
+                <button onclick="viewProfile('${p.id}')" style="width:100%; margin-top:8px;">View</button>
             </div>
         `;
     });
@@ -379,6 +335,7 @@ async function showProfileSelection() {
 
     <div style="text-align:center; margin-top:25px;">
         <button onclick="showCreateProfileForm()">Create New Profile</button>
+        <button onclick="showProfileLoginForm()">Log Into Another Profile</button>
     </div>
 
     <div style="text-align:center; margin-top:10px;">
@@ -390,6 +347,62 @@ async function showProfileSelection() {
 `;
 
     container.innerHTML = html;
+}
+
+function showProfileLoginForm() {
+    const container = document.getElementById("profileSelectScreen");
+    container.style.display = "block";
+    container.innerHTML = `
+        <h2 style="text-align:center;">Log Into Profile</h2>
+        <div style="max-width:320px; margin:20px auto; padding:20px; background:#f9f9f9; border:1px solid #ccc; border-radius:10px;">
+            <label>Profile Name:</label><br>
+            <input id="loginProfileName" style="width:100%; margin-bottom:12px;"><br>
+            <label>PIN:</label><br>
+            <input id="loginProfilePin" type="password" maxlength="10" style="width:100%; margin-bottom:16px;"><br>
+            <button onclick="loginToProfile()" style="width:100%; margin-bottom:10px;">Log In</button>
+            <button onclick="showProfileSelection()" style="width:100%;">Back</button>
+        </div>
+    `;
+}
+
+async function loginToProfile() {
+    const name = document.getElementById("loginProfileName").value.trim();
+    const pin = document.getElementById("loginProfilePin").value.trim();
+
+    if (!name || !pin) {
+        alert("Enter a profile name and PIN.");
+        return;
+    }
+
+    const profileQuery = query(
+        collection(window.db, "profiles"),
+        where("nameNormalized", "==", normalizeProfileName(name))
+    );
+    const snapshot = await getDocs(profileQuery);
+
+    if (snapshot.empty) {
+        alert("Profile not found or unavailable for online login.");
+        return;
+    }
+
+    const matchingProfile = {
+        id: snapshot.docs[0].id,
+        ...snapshot.docs[0].data()
+    };
+
+    if (matchingProfile.onlineCapable === false) {
+        alert("This profile is local-play only and cannot be logged into from another device.");
+        return;
+    }
+
+    const enteredHash = await hashPIN(pin);
+    if (enteredHash !== matchingProfile.pinHash) {
+        alert("Incorrect PIN.");
+        return;
+    }
+
+    rememberProfileOnDevice(matchingProfile.id);
+    await finalizeProfileSelection(matchingProfile.id);
 }
 
 function showCreateGroupForm() {
@@ -489,6 +502,42 @@ function renderIconPicker() {
     });
 }
 
+function renderProfileAvatarPicker(pickerId, inputId, selectedAvatar) {
+    const picker = document.getElementById(pickerId);
+    const input = document.getElementById(inputId);
+    if (!picker || !input) return;
+
+    input.value = approvedIcons.includes(selectedAvatar) ? selectedAvatar : "🙂";
+    picker.innerHTML = "";
+    picker.style.display = "flex";
+    picker.style.flexWrap = "wrap";
+    picker.style.gap = "8px";
+    picker.style.justifyContent = "center";
+
+    approvedIcons.forEach(icon => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = icon;
+        button.title = `Choose ${icon} avatar`;
+        button.style.fontSize = "1.5em";
+        button.style.padding = "6px 10px";
+        button.style.border = icon === input.value ? "2px solid #007bff" : "1px solid #ccc";
+        button.style.borderRadius = "6px";
+        button.style.cursor = "pointer";
+        button.style.background = "#fff";
+
+        button.onclick = () => {
+            input.value = icon;
+            picker.querySelectorAll("button").forEach(option => {
+                option.style.border = "1px solid #ccc";
+            });
+            button.style.border = "2px solid #007bff";
+        };
+
+        picker.appendChild(button);
+    });
+}
+
 function escapeHTML(str) {
     return str.replace(/[&<>"']/g, c => ({
         "&": "&amp;",
@@ -555,13 +604,19 @@ async function submitGroupRequest() {
 
     // 3. Create provisional admin profile
     await setDoc(doc(window.db, "profiles", uid), {
+        profileId: uid,
+        ownerUid: uid,
         name: adminName,
+        nameNormalized: normalizeProfileName(adminName),
         avatar: selectedIcon,
         color: "#ffffff",
         role: "provisionalAdmin",
         adminId: uid,
+        onlineCapable: true,
         location,
         description,
+        lifetimeStats: buildDefaultLifetimeStats(),
+        multiplayerStats: buildDefaultMultiplayerStats(),
         createdAt: Date.now(),
         updatedAt: Date.now()
     });
@@ -619,11 +674,18 @@ function showCreateProfileForm() {
             <label>Name:</label><br>
             <input id="newProfileName" placeholder="Enter name" style="width:100%; margin-bottom:10px;"><br>
 
-            <label>Avatar (emoji):</label><br>
-            <input id="newProfileAvatar" placeholder="🙂" style="width:100%; margin-bottom:10px;"><br>
+            <label>Choose Avatar:</label><br>
+            <input id="newProfileAvatar" type="hidden" value="🙂">
+            <div id="newProfileAvatarPicker" style="margin-bottom:15px;"></div>
 
             <label>Color (optional):</label><br>
             <input id="newProfileColor" placeholder="#4A90E2" style="width:100%; margin-bottom:20px;"><br>
+
+            <label>Profile Access:</label><br>
+            <select id="newProfileAccess" style="width:100%; margin-bottom:20px;">
+                <option value="online" selected>Online capable</option>
+                <option value="local">Local device only</option>
+            </select>
 
             <label>Choose Admin / Group:</label><br>
             <select id="adminSelect" style="width:100%; margin-bottom:20px;">
@@ -648,17 +710,179 @@ function showCreateProfileForm() {
         </div>
     `;
 
+    renderProfileAvatarPicker("newProfileAvatarPicker", "newProfileAvatar", "🙂");
     populateAdminDropdown();
 }
 
-async function editProfile() {
+async function viewCurrentProfile() {
     const profileId = localStorage.getItem("selectedProfileId");
+    if (!profileId) {
+        showProfileSelection();
+        return;
+    }
+    await viewProfile(profileId);
+}
+
+async function showLeaderboard() {
+    showScreen("leaderboardScreen");
+
+    const container = document.getElementById("leaderboardScreen");
+    container.style.display = "block";
+
+    const profiles = await loadAllProfiles();
+    const currentProfileId = localStorage.getItem("selectedProfileId");
+
+    const rankedProfiles = profiles
+        .map(profile => ({
+            ...profile,
+            stats: normalizeLifetimeStats(profile.lifetimeStats || {})
+        }))
+        .sort((a, b) => {
+            if ((b.stats.totalPoints || 0) !== (a.stats.totalPoints || 0)) {
+                return (b.stats.totalPoints || 0) - (a.stats.totalPoints || 0);
+            }
+            if ((b.stats.wins || 0) !== (a.stats.wins || 0)) {
+                return (b.stats.wins || 0) - (a.stats.wins || 0);
+            }
+            return (b.stats.bestScore || 0) - (a.stats.bestScore || 0);
+        });
+
+    let html = `
+        <h2 style="text-align:center;">Leaderboard</h2>
+        <div style="max-width:800px; margin:20px auto; padding:20px; background:#f9f9f9; border:1px solid #ccc; border-radius:10px;">
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                    <tr style="border-bottom:1px solid #ccc;">
+                        <th style="padding:8px;">Rank</th>
+                        <th style="padding:8px;">Profile</th>
+                        <th style="padding:8px;">Points</th>
+                        <th style="padding:8px;">Wins</th>
+                        <th style="padding:8px;">Best</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    if (rankedProfiles.length === 0) {
+        html += `
+            <tr>
+                <td colspan="5" style="padding:18px; text-align:center; opacity:0.7;">No profiles have recorded stats yet.</td>
+            </tr>
+        `;
+    } else {
+        rankedProfiles.forEach((profile, index) => {
+            const isCurrent = profile.id === currentProfileId;
+            html += `
+                <tr style="border-bottom:1px solid #eee; ${isCurrent ? "background:#ecfdf5;" : ""}">
+                    <td style="padding:10px 8px; font-weight:${isCurrent ? "bold" : "normal"};">#${index + 1}</td>
+                    <td style="padding:10px 8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:1.6em;">${profile.avatar || "🙂"}</span>
+                            <span>${profile.name || "Unnamed Profile"}${isCurrent ? " (You)" : ""}</span>
+                        </div>
+                    </td>
+                    <td style="padding:10px 8px;">${profile.stats.totalPoints || 0}</td>
+                    <td style="padding:10px 8px;">${profile.stats.wins || 0}</td>
+                    <td style="padding:10px 8px;">${profile.stats.bestScore || 0}</td>
+                </tr>
+            `;
+        });
+    }
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div style="text-align:center; margin-top:20px;">
+            <button onclick="startMainMenu()">Back</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+async function viewProfile(profileId) {
+    const profile = await loadProfile(profileId);
+    if (!profile) {
+        alert("Profile not found.");
+        showProfileSelection();
+        return;
+    }
+
+    document.getElementById("screenMenu").style.display = "none";
+    document.getElementById("screenSingleOptions").style.display = "none";
+    document.getElementById("screenMultiOptions").style.display = "none";
+    document.getElementById("screenQuiz").style.display = "none";
+
+    const container = document.getElementById("profileSelectScreen");
+    container.style.display = "block";
+
+    const singleStats = normalizeLifetimeStats(profile.lifetimeStats || {});
+    const multiplayerStats = normalizeLifetimeStats(profile.multiplayerStats || {});
+    const stats = combineProfileStats(singleStats, multiplayerStats);
+
+    container.innerHTML = `
+        <h2 style="text-align:center;">Profile Details</h2>
+
+        <div style="max-width:600px; margin:20px auto; padding:20px; background:#f9f9f9; border:1px solid #ccc; border-radius:10px;">
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+                <div style="font-size:3em;">${profile.avatar || "🙂"}</div>
+                <div>
+                    <h3 style="margin:0;">${profile.name || "Unnamed Profile"}</h3>
+                    <p style="margin:4px 0 0 0; opacity:0.7;">Role: ${profile.role || "member"}</p>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px;">
+                <div><strong>Single Player Points:</strong> ${singleStats.totalPoints}</div>
+                <div><strong>Local Multiplayer Points:</strong> ${multiplayerStats.totalPoints}</div>
+                <div><strong>Combined Points:</strong> ${stats.totalPoints}</div>
+                <h3 style="grid-column:1/-1; margin:8px 0 0;">Combined Stats</h3>
+                <div><strong>Combined Games:</strong> ${stats.gamesPlayed}</div>
+                <div><strong>Combined Wins:</strong> ${stats.wins}</div>
+                <div><strong>Combined Losses:</strong> ${stats.losses}</div>
+                <div><strong>Combined Correct:</strong> ${stats.correct}</div>
+                <div><strong>Combined Incorrect:</strong> ${stats.incorrect}</div>
+                <div><strong>Combined Points:</strong> ${stats.totalPoints}</div>
+                <div><strong>Combined Best Score:</strong> ${stats.bestScore}</div>
+                <div><strong>Combined Average Score:</strong> ${formatStat(stats.averageScore)}</div>
+                <div><strong>Combined Fastest Correct:</strong> ${stats.fastestCorrectAnswer ?? "—"}</div>
+                <div><strong>Combined Best Streak:</strong> ${stats.streakBest}</div>
+            </div>
+
+            <h3 style="margin:20px 0 10px;">Local Multiplayer Stats</h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px;">
+                <div><strong>Games:</strong> ${multiplayerStats.gamesPlayed}</div>
+                <div><strong>Wins:</strong> ${multiplayerStats.wins}</div>
+                <div><strong>Losses:</strong> ${multiplayerStats.losses}</div>
+                <div><strong>Correct:</strong> ${multiplayerStats.correct}</div>
+                <div><strong>Incorrect:</strong> ${multiplayerStats.incorrect}</div>
+                <div><strong>Best Score:</strong> ${multiplayerStats.bestScore}</div>
+                <div><strong>Average Score:</strong> ${formatStat(multiplayerStats.averageScore)}</div>
+                <div><strong>Fastest Answer:</strong> ${multiplayerStats.fastestCorrectAnswer ?? "—"}</div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <p><strong>Group:</strong> ${profile.groupName || "No group joined"}</p>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
+                <button onclick="editProfile('${profileId}')">Edit Profile</button>
+                <button onclick="showCreateGroupForm()">Create / Join Group</button>
+                <button onclick="leaveGroup('${profileId}')">Leave Group</button>
+                <button onclick="startMainMenu()">Back</button>
+            </div>
+        </div>
+    `;
+}
+
+async function editProfile(profileIdOverride) {
+    const profileId = profileIdOverride || localStorage.getItem("selectedProfileId");
     if (!profileId) return;
 
     const profile = await loadProfile(profileId);
     const container = document.getElementById("profileSelectScreen");
 
-    // Hide other screens
     document.getElementById("screenMenu").style.display = "none";
     document.getElementById("screenSingleOptions").style.display = "none";
     document.getElementById("screenMultiOptions").style.display = "none";
@@ -670,7 +894,7 @@ async function editProfile() {
         <h2 style="text-align:center;">Edit Profile</h2>
 
         <div style="
-            max-width:300px;
+            max-width:350px;
             margin:20px auto;
             padding:20px;
             background:#f9f9f9;
@@ -680,14 +904,31 @@ async function editProfile() {
             <label>Name:</label><br>
             <input id="editProfileName" value="${profile.name}" style="width:100%; margin-bottom:10px;"><br>
 
-            <label>Avatar (emoji):</label><br>
-            <input id="editProfileAvatar" value="${profile.avatar}" style="width:100%; margin-bottom:10px;"><br>
+            <label>Choose Avatar:</label><br>
+            <input id="editProfileAvatar" type="hidden" value="${profile.avatar || "🙂"}">
+            <div id="editProfileAvatarPicker" style="margin-bottom:15px;"></div>
 
             <label>Color:</label><br>
-            <input id="editProfileColor" value="${profile.color}" style="width:100%; margin-bottom:20px;"><br>
+            <input id="editProfileColor" value="${profile.color}" style="width:100%; margin-bottom:10px;"><br>
+
+            <label>Profile Access:</label><br>
+            <select id="editProfileAccess" style="width:100%; margin-bottom:20px;">
+                <option value="online" ${profile.onlineCapable !== false ? "selected" : ""}>Online capable</option>
+                <option value="local" ${profile.onlineCapable === false ? "selected" : ""}>Local device only</option>
+            </select>
+
+            <label>New 4-digit PIN:</label><br>
+            <input id="editProfilePin" type="password" maxlength="4" style="width:100%; font-size:20px; text-align:center; margin-bottom:10px;"><br>
+
+            <label>Confirm New PIN:</label><br>
+            <input id="editProfilePinConfirm" type="password" maxlength="4" style="width:100%; font-size:20px; text-align:center; margin-bottom:20px;"><br>
 
             <button onclick="saveProfileEdits('${profileId}')" style="width:100%; margin-bottom:10px;">
                 Save Changes
+            </button>
+
+            <button onclick="viewProfile('${profileId}')" style="width:100%; margin-bottom:10px;">
+                Profile View
             </button>
 
             <button onclick="startMainMenu()" style="width:100%;">
@@ -695,37 +936,69 @@ async function editProfile() {
             </button>
         </div>
     `;
+
+    renderProfileAvatarPicker("editProfileAvatarPicker", "editProfileAvatar", profile.avatar || "🙂");
+}
+
+async function leaveGroup(profileId) {
+    const ref = doc(window.db, "profiles", profileId);
+    await updateDoc(ref, {
+        groupId: null,
+        groupName: null,
+        updatedAt: Date.now()
+    });
+    alert("You left the group.");
+    await viewProfile(profileId);
 }
 
 async function saveProfileEdits(profileId) {
     const name = document.getElementById("editProfileName").value.trim();
     const avatar = document.getElementById("editProfileAvatar").value.trim();
     const color = document.getElementById("editProfileColor").value.trim();
+    const onlineCapable = document.getElementById("editProfileAccess").value === "online";
+    const newPin = document.getElementById("editProfilePin")?.value.trim() || "";
+    const confirmPin = document.getElementById("editProfilePinConfirm")?.value.trim() || "";
 
     if (!name) {
         alert("Name cannot be empty");
         return;
     }
 
-    const ref = doc(window.db, "profiles", profileId);
+    if (newPin || confirmPin) {
+        if (!/^\d{4}$/.test(newPin)) {
+            alert("New PIN must be exactly 4 digits.");
+            return;
+        }
+        if (newPin !== confirmPin) {
+            alert("New PINs do not match.");
+            return;
+        }
+    }
 
-    await setDoc(ref, {
-	  name,
-	  avatar,
-	  color,
-	  role: "member",          // default for now
-	  adminId: window.auth.currentUser.uid,  // temporary until admin selection UI
-	  lifetimeStats: {
-		gamesPlayed: 0,
-		correct: 0,
-		incorrect: 0,
-		fastestTime: null,
-		averageTime: null,
-		streakBest: 0
-	  },
-	  createdAt: Date.now(),
-	  updatedAt: Date.now()
-	});
+    const user = window.auth.currentUser;
+    if (!user) {
+        alert("You must be signed in to edit a profile.");
+        return;
+    }
+
+    const ref = doc(window.db, "profiles", profileId);
+    const updates = {
+        name,
+        nameNormalized: normalizeProfileName(name),
+        avatar,
+        color,
+        onlineCapable,
+        ownerUid: user.uid,
+        adminId: user.uid,
+        role: "member",
+        updatedAt: Date.now()
+    };
+
+    if (newPin) {
+        updates.pinHash = await hashPIN(newPin);
+    }
+
+    await updateDoc(ref, updates);
 
     startMainMenu();
 }
@@ -734,6 +1007,7 @@ async function createProfileFromForm() {
     const name = document.getElementById("newProfileName").value.trim();
     const avatar = document.getElementById("newProfileAvatar").value.trim() || "🙂";
     const color = document.getElementById("newProfileColor").value.trim() || "#4A90E2";
+    const onlineCapable = document.getElementById("newProfileAccess").value === "online";
     const adminId = document.getElementById("adminSelect").value;
 
     const pin = document.getElementById("newProfilePin").value.trim();
@@ -755,7 +1029,7 @@ async function createProfileFromForm() {
     }
 
     // Create the profile
-    const profileId = await createPlayerProfile(name, avatar, color, pin, adminId);
+    const profileId = await createPlayerProfile(name, avatar, color, pin, adminId, onlineCapable);
 
     // Unlock for this session
     sessionUnlockedProfileId = profileId;
@@ -784,6 +1058,7 @@ async function finalizeProfileSelection(profileId) {
 
     // Save selected profile for reloads
     localStorage.setItem("selectedProfileId", profileId);
+    rememberProfileOnDevice(profileId);
 
     // Unlock this profile for the current session
     unlockProfileSession(profileId);
@@ -796,6 +1071,9 @@ async function finalizeProfileSelection(profileId) {
         showProfileSelection();
         return;
     }
+
+    // Persist compatibility value used by older single-player startup logic
+    localStorage.setItem("selectedProfile", JSON.stringify(profile));
 
     // Store it globally so the rest of the app can use it
     window.currentProfile = profile;
@@ -823,7 +1101,8 @@ async function submitProfilePin() {
         return;
     }
 
-    if (hash(pin) === profile.pinHash) {
+    const enteredHash = await hashPIN(pin);
+    if (enteredHash === profile.pinHash) {
         sessionUnlockedProfileId = profileId; // unlock for this session
         await finalizeProfileSelection(profileId);
     } else {
@@ -855,29 +1134,28 @@ async function updateActiveProfileDisplay() {
         </div>
     `;
 }
-    function renderPlayerInputs() {
+async function startSinglePlayerGame() {
+    const profileId = localStorage.getItem("selectedProfileId");
+    let profile = null;
 
-   const numPlayers = parseInt(document.getElementById("playersInput").value);
-   let inputs = "";
-   for (let i = 0; i < numPlayers; i++) {
-       // If players[i] exists, use its name. Otherwise default to "Player X"
-       const existingName = players[i] ? players[i].name : `Player ${i+1}`;
-       inputs += `
-<label>
-               Player ${i+1} Name:
-<input type="text" id="playerName${i}" value="${existingName}">
-</label><br>
-       `;
-   }
-   document.getElementById("playerNames").innerHTML = inputs;
-}
+    try {
+        const savedProfile = localStorage.getItem("selectedProfile");
+        profile = savedProfile ? JSON.parse(savedProfile) : null;
+    } catch (error) {
+        console.warn("Saved profile data was not valid JSON.", error);
+    }
 
-function startSinglePlayerGame() {
+    if (!profile && profileId) {
+        profile = await loadProfile(profileId);
+    }
 
-    // Get selected profile
-    const profile = JSON.parse(localStorage.getItem("selectedProfile"));
-    const name = profile ? profile.name : "Player";
+    if (!profile) {
+        alert("Please select a valid profile before starting a game.");
+        showProfileSelection();
+        return;
+    }
 
+    const name = profile.name || "Player";
     const rounds = parseInt(document.getElementById("singlePlayerRoundsInput").value);
     const quizTypeUI = document.getElementById("singlePlayerQuizType").value;
     const testamentUI = document.getElementById("singlePlayerTestament").value;
@@ -885,7 +1163,6 @@ function startSinglePlayerGame() {
     const timeBonusUI = document.getElementById("singlePlayerTimeBonus").checked;
     const timerLengthUI = parseInt(document.getElementById("singlePlayerTimerLength").value);
 
-    // Store settings
     singlePlayerSettings = {
         name,
         rounds,
@@ -896,10 +1173,9 @@ function startSinglePlayerGame() {
         timerLength: timerLengthUI
     };
 
-    // Initialize player object
     currentPlayer = {
         name,
-        profileId: profile.id,
+        profileId: profile.id || profileId,
         points: 0,
         correct: 0,
         incorrect: 0,
@@ -909,7 +1185,7 @@ function startSinglePlayerGame() {
         fastestTime: null
     };
 
-    // Apply settings globally
+    totalRounds = rounds;
     currentRound = 1;
     quizType = quizTypeUI;
     testament = testamentUI;
@@ -917,157 +1193,10 @@ function startSinglePlayerGame() {
     timeBonusEnabled = timeBonusUI;
     timerLength = timerLengthUI;
 
-    // Start the game
     gameMode = "single";
     showScreen("screenQuiz");
     startTrivia();
 }
-
-function saveOptions() {
-
-  console.log("Checkbox state at saveOptions:", document.getElementById("timerEnabled").checked);
-
-  // Read UI values
-	rounds = parseInt(document.getElementById("roundsInput").value);
-	const numPlayers = parseInt(document.getElementById("playersInput").value);
-	quizType = document.getElementById("quizType").value;
-	timerLength = parseInt(document.getElementById("timerInput").value);
-	testament = document.getElementById("testamentSelect").value;
-
-	timerEnabled = document.getElementById("timerEnabled").checked;
-	timeBonusEnabled = document.getElementById("timeBonusCheckbox").checked;
-	const startingTalents = parseInt(document.getElementById("talentsInput").value);
-
-  // Rebuild players
-  const newPlayers = [];
-  for (let i = 0; i < numPlayers; i++) {
-    const name = document.getElementById(`playerName${i}`).value || `Player ${i+1}`;
-    if (players[i]) {
-      newPlayers.push({
-  name,
-  correct: players[i].correct,
-  incorrect: players[i].incorrect,
-  points: players[i].points,
-  avgTime: players[i].avgTime || 0,
-  totalTime: players[i].totalTime || 0,
-  questionsAnswered: players[i].questionsAnswered || 0,
-  fastestTime: players[i].fastestTime || null,
-  talents: players[i].talents || { 
-	  starting: startingTalents, 
-	  current: startingTalents, 
-	  gained: 0, 
-	  wasted: 0, 
-	  redemptions: 0, 
-	  redemptionsSuccessful: 0 
-	  }
-  
-});
-
-    } else {
-      newPlayers.push({ name, 
-	  correct: 0, 
-	  incorrect: 0, 
-	  points: 0, 
-	  avgTime: 0, 
-	  totalTime: 0, 
-	  questionsAnswered: 0, 
-	  fastestTime: null, 
-	  talents: {
-			starting: startingTalents,          // initial amount chosen in options
-			current: startingTalents,           // live balance during the match
-			gained: 0,                          // earned during the match
-			wasted: 0,                          // opportunities passed or lost
-			redemptions: 0,                     // attempts made (cost 1 Talent)
-			redemptionsSuccessful: 0            // successful attempts
-		}
-
- });
-    }
-  }
-
-  players = newPlayers;
-
-  // Update UI
-  updateScoreboard();
-
-  // Save everything in one place
-  persistSettings();
-}
-
-function startLocalMultiplayerGame() {
-    console.log("Starting Local Multiplayer Game...");
-
-    const numPlayers = parseInt(document.getElementById("playersInput").value);
-	const startingTalents = parseInt(document.getElementById("talentsInput").value);
-
-
-    players = [];
-    for (let i = 0; i < numPlayers; i++) {
-        const nameField = document.getElementById(`playerName${i}`);
-        const name = nameField ? nameField.value.trim() : "";
-
-        if (!name) {
-            alert(`Player ${i + 1} must have a name.`);
-            return;
-        }
-
-        players.push({
-			name,
-			points: 0,
-			correct: 0,
-			incorrect: 0,
-			avgTime: 0,
-			totalTime: 0,
-			questionsAnswered: 0,
-			fastestTime: null,
-			
-			talents: {
-				starting: startingTalents,          // initial amount chosen in options
-				current: startingTalents,           // live balance during the match
-				gained: 0,                          // earned during the match
-				wasted: 0,                          // opportunities passed or lost
-				redemptions: 0,                     // attempts made (cost 1 Talent)
-				redemptionsSuccessful: 0            // successful attempts
-			}
-
-
-        });
-    }
-
-    // Load settings
-    rounds = parseInt(document.getElementById("roundsInput").value);
-    currentRound = 1;
-
-    quizType = document.getElementById("quizType").value;
-    testament = document.getElementById("testamentSelect").value;
-
-    timerEnabled = document.getElementById("timerEnabled").checked;
-    timeBonusEnabled = document.getElementById("timeBonusCheckbox").checked;
-    timerLength = parseInt(document.getElementById("timerInput").value);
-
-
-  
-	showScreen("screenQuiz");
-    currentPlayerIndex = 0;
-
-    startTrivia();
-}
-
-
-function persistSettings() {
-  localStorage.setItem("quizSettings", JSON.stringify({
-    rounds,
-    numPlayers: players.length,
-    quizType,
-    timerLength,
-    players,
-    testament,
-    timerEnabled,
-    timeBonusEnabled,
-	startingTalents: parseInt(document.getElementById("talentsInput").value)
-  }));
-}
-
 
  
 function backToMenu() {
@@ -1154,7 +1283,7 @@ async function runQuiz() {
 
     // UI: progress + turn
     document.getElementById("progress").innerHTML =
-        `Round ${roundIndex} of ${rounds}<br>
+        `Round ${roundIndex} of ${totalRounds}<br>
          <em>Round Type: ${
             typeToUse === "multiple" ? "Guess the Book" :
             typeToUse === "fill" ? "Fill in the Blank" :
@@ -1977,140 +2106,11 @@ function awardPoints(basePoints, timeLeft = 0, ) {
 }
 
 
-function animateScore(element, start, end, duration = 800) {
-  let range = end - start;
-  if (range === 0) {
-    element.textContent = end;
-    return;
-  }
-
-  let stepTime = Math.max(Math.floor(duration / Math.abs(range)), 10);
-  let current = start;
-  let increment = end > start ? 1 : -1;
-
-  let timer = setInterval(() => {
-    current += increment;
-    element.textContent = current;
-    if (current === end) {
-      clearInterval(timer);
-      element.classList.add("score-glow");
-      setTimeout(() => element.classList.remove("score-glow"), 500);
-    }
-  }, stepTime);
-}
-
-function updateScoreboard() {
-    const scoreboard = document.getElementById("scoreboard");
-
-    // SINGLE PLAYER MODE
-    if (gameMode === "single") {
-        const p = currentPlayer;
-
-        scoreboard.innerHTML = `
-            <div style="text-align:center; margin-bottom:15px;">
-                <h2 style="
-                    font-family:'Trebuchet MS', sans-serif;
-                    font-weight:bold;
-                    color:#BB0000;
-                    letter-spacing:2px;
-                    margin:0;
-                ">
-                    KJV Quiz Challenge
-                </h2>
-                <hr style="
-                    width:60%;
-                    border:0;
-                    height:3px;
-                    background:linear-gradient(to right, #BB0000, #666666);
-                    margin:8px auto;
-                ">
-                <p style="
-                    font-style:italic;
-                    color:#666666;
-                    margin:0;
-                ">
-                    Who will wear the crown?
-                </p>
-            </div>
-
-            <p class="active-player">
-                ${p.name}: Points: <span id="player0Points">${p.points}</span>
-            </p>
-        `;
-
+function resetScores() {
+    if (gameMode !== "local-multiplayer") {
         return;
     }
 
-    // MULTIPLAYER MODE
-    const oldValues = {};
-    players.forEach((p, idx) => {
-        const oldEl = document.getElementById(`player${idx}Points`);
-        oldValues[idx] = oldEl ? parseInt(oldEl.textContent) : p.points;
-    });
-
-    // Leader(s)
-    const maxPoints = Math.max(...players.map(p => p.points));
-    const leaders = players.filter(p => p.points === maxPoints);
-
-    // HEADER
-    scoreboard.innerHTML = `
-        <div style="text-align:center; margin-bottom:15px;">
-            <h2 style="
-                font-family:'Trebuchet MS', sans-serif;
-                font-weight:bold;
-                color:#BB0000;
-                letter-spacing:2px;
-                margin:0;
-            ">
-                KJV Quiz Challenge
-            </h2>
-            <hr style="
-                width:60%;
-                border:0;
-                height:3px;
-                background:linear-gradient(to right, #BB0000, #666666);
-                margin:8px auto;
-            ">
-            <p style="
-                font-style:italic;
-                color:#666666;
-                margin:0;
-            ">
-                Who will wear the crown?
-            </p>
-        </div>
-    `;
-
-    // PLAYER ROWS
-    players.forEach((p, idx) => {
-        const isActive = (idx === currentPlayerIndex);
-
-        const playerP = document.createElement("p");
-        if (isActive) playerP.classList.add("active-player");
-
-        const crown = leaders.includes(p) ? " 👑" : "";
-
-        playerP.innerHTML = `
-            <strong>${p.name}${crown}</strong>: Points: 
-            <span id="player${idx}Points"></span>
-            <br>
-            <span style="font-size:0.85em; color:#444;">
-                Talents: ${p.talents.current} / ${p.talents.starting}
-                &nbsp;|&nbsp; Redeems: ${p.talents.redemptions}
-                &nbsp;|&nbsp; Success: ${p.talents.redemptionsSuccessful}
-                &nbsp;|&nbsp; Wasted: ${p.talents.wasted}
-            </span>
-        `;
-
-        const pointsSpan = playerP.querySelector(`#player${idx}Points`);
-        animateScore(pointsSpan, oldValues[idx], p.points);
-
-        scoreboard.appendChild(playerP);
-    });
-}
-
-
-function resetScores() {
   players.forEach(p => {
     p.points = 0;
     p.correct = 0;
@@ -2509,19 +2509,41 @@ function endGameSinglePlayer() {
                 if (profile) {
                     const lifetime = profile.lifetimeStats;
 
+                    const gameScore = p.points || 0;
+                    const previousGames = lifetime.gamesPlayed || 0;
+                    const nextGames = previousGames + 1;
+                    const previousScoreTotal = lifetime.totalPoints || 0;
+                    const previousAverage = lifetime.averageScore || 0;
+
                     const updatedStats = {
-                        gamesPlayed: (lifetime.gamesPlayed || 0) + 1,
+                        gamesPlayed: nextGames,
+                        wins: (lifetime.wins || 0) + (gameScore > 0 ? 1 : 0),
+                        losses: (lifetime.losses || 0) + (gameScore <= 0 ? 1 : 0),
                         correct: (lifetime.correct || 0) + roundStats.correct,
                         incorrect: (lifetime.incorrect || 0) + roundStats.incorrect,
+                        totalPoints: previousScoreTotal + gameScore,
+                        bestScore: Math.max(lifetime.bestScore || 0, gameScore),
+                        averageScore:
+                            nextGames === 1
+                                ? gameScore
+                                : ((previousAverage * previousGames) + gameScore) / nextGames,
+                        fastestCorrectAnswer:
+                            lifetime.fastestCorrectAnswer === null || lifetime.fastestCorrectAnswer === undefined
+                                ? (p.fastestTime !== null && p.fastestTime !== undefined ? p.fastestTime : null)
+                                : (p.fastestTime !== null && p.fastestTime !== undefined
+                                    ? Math.min(lifetime.fastestCorrectAnswer, p.fastestTime)
+                                    : lifetime.fastestCorrectAnswer),
                         fastestTime:
-                            lifetime.fastestTime === null
+                            lifetime.fastestTime === null || lifetime.fastestTime === undefined
                                 ? roundStats.fastestTime
                                 : Math.min(lifetime.fastestTime, roundStats.fastestTime),
                         averageTime:
-                            lifetime.averageTime === null
+                            lifetime.averageTime === null || lifetime.averageTime === undefined
                                 ? roundStats.averageTime
                                 : (lifetime.averageTime + roundStats.averageTime) / 2,
-                        streakBest: Math.max(lifetime.streakBest || 0, roundStats.streakBest || 0)
+                        streakBest: Math.max(lifetime.streakBest || 0, roundStats.streakBest || 0),
+                        booksCompleted: Array.isArray(lifetime.booksCompleted) ? lifetime.booksCompleted : [],
+                        achievementsUnlocked: Array.isArray(lifetime.achievementsUnlocked) ? lifetime.achievementsUnlocked : []
                     };
 
                     updateLifetimeStats(profileId, updatedStats)
@@ -2590,6 +2612,10 @@ function endGame() {
     const sorted = [...players].sort((a, b) => b.points - a.points);
     const top = sorted.slice(0, Math.min(3, sorted.length));
 
+    recordLocalMultiplayerStats()
+        .then(() => console.log("Local multiplayer stats updated"))
+        .catch(err => console.error("Error updating multiplayer stats:", err));
+
     // Build the podium container (mobile-friendly)
     document.getElementById("quiz").innerHTML = `
       <h2 style="text-align:center; font-size:2em; margin-bottom:20px;">
@@ -2621,17 +2647,25 @@ function endGame() {
     document.getElementById("turn").innerHTML = "";
     document.getElementById("controls").innerHTML = "";
 
-    // Podium height + color definitions
+        // Podium height + color definitions
     const podiumStyles = {
-      3: { color: "#cd7f32", height: 120 }, // Bronze
-      2: { color: "#c0c0c0", height: 150 }, // Silver
-      1: { color: "#ffd700", height: 200 }  // Gold
+            3: { color: "#9a4d22", height: 120 }, // Bronze
+            2: { color: "#aeb7c2", height: 150 }, // Silver
+            1: { color: "#f2b705", height: 200 }  // Gold
     };
 
-    // Reveal order: 3rd → 2nd → 1st
-    top.reverse().forEach((p, index) => {
+        const podiumEntries = top.map((p, index) => ({
+            player: p,
+            place: top.length === 1
+                ? 1
+                : top.length === 2
+                    ? (index === 0 ? 1 : 2)
+                    : (index === 0 ? 1 : index === 1 ? 2 : 3)
+        })).sort((a, b) => b.place - a.place);
 
-      const place = index === 0 ? 3 : index === 1 ? 2 : 1;
+        // Reveal order: 3rd → 2nd → 1st
+        podiumEntries.forEach(({ player: p, place }, index) => {
+
       const podium = podiumStyles[place];
 
       setTimeout(() => {
@@ -2752,80 +2786,6 @@ function fadeToBlack(callback) {
     togglePause(currentRoundType || quizType);
   }
 });
-
-async function createPlayerProfile(name, avatar, color, pin, adminId) {
-    const ref = doc(collection(window.db, "profiles"));
-
-    const pinHash = btoa(pin);
-
-    const profileData = {
-        name,
-        avatar,
-        color,
-        pinHash,
-        ownerType: "pin",
-        role: "member",        // ⭐ restored role
-        adminId: adminId || null,
-
-        lifetimeStats: {
-            gamesPlayed: 0,
-            correct: 0,
-            incorrect: 0,
-            fastestTime: null,
-            averageTime: null,
-            streakBest: 0
-        },
-
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    };
-
-    await setDoc(ref, profileData);
-    return ref.id;
-}
-
-function hash(str) {
-    return btoa(str); // not secure, but works for testing
-}
-
-async function loadAllProfiles() {
-    const profilesCol = collection(window.db, "profiles");
-    const snapshot = await getDocs(profilesCol);
-
-    const profiles = [];
-    snapshot.forEach(doc => {
-        profiles.push({ id: doc.id, ...doc.data() });
-    });
-
-    return profiles;
-}
-
-async function loadProfile(profileId) {
-    const ref = doc(window.db, "profiles", profileId);
-    const snapshot = await getDoc(ref);
-
-    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
-}
-
-async function loadAllAdmins() {
-    const adminsRef = collection(window.db, "admins");
-    const snapshot = await getDocs(adminsRef);
-    const admins = [];
-
-    snapshot.forEach(doc => {
-        admins.push({ id: doc.id, ...doc.data() });
-    });
-
-    return admins;
-}
-
-function isAdmin(profile) {
-  return profile.role === "admin";
-}
-
-function isDeveloper(profile) {
-  return profile.role === "developer";
-}
 
 async function showDeveloperDashboard() {
     // Hide other screens
@@ -2950,15 +2910,7 @@ async function denyAdminRequest(requestId, userUid) {
     showDeveloperDashboard();
 }
 
-async function updateLifetimeStats(profileId, updates, pinHash) {
-    const ref = doc(window.db, "profiles", profileId);
-
-    await updateDoc(ref, {
-        lifetimeStats: updates,
-        updatedAt: Date.now(),
-        pinHashProvided: pinHash
-    });
-}
+// Multiplayer stats are recorded by profile-stats-service.js.
 
 
 
