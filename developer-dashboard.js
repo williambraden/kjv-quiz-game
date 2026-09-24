@@ -97,6 +97,12 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 function decodePinHash(pinHash) {
+    if (!pinHash) return "—";
+
+    if (/^[0-9a-fA-F]{64}$/.test(pinHash)) {
+        return "SHA-256 pin hash stored (not reversible)";
+    }
+
     try {
         return atob(pinHash);
     } catch {
@@ -461,6 +467,7 @@ async function loadMembers() {
             <p><strong>Games Played:</strong> ${p.lifetimeStats?.gamesPlayed ?? p.gamesPlayed ?? 0}</p>
             <p><strong>Correct:</strong> ${p.lifetimeStats?.correct ?? p.correct ?? 0}</p>
             <p><strong>Incorrect:</strong> ${p.lifetimeStats?.incorrect ?? p.incorrect ?? 0}</p>
+            <p><strong>Total Points:</strong> ${p.lifetimeStats?.totalPoints ?? p.totalPoints ?? 0}</p>
             <p class="small"><strong>Profile UID:</strong> ${uid}</p>
         `;
 
@@ -519,12 +526,20 @@ async function resetMemberStats(profileUid) {
 
     const resetStats = {
         ...lifetimeStats,
+        wins: 0,
+        losses: 0,
         correct: 0,
         incorrect: 0,
+        totalPoints: 0,
+        bestScore: 0,
+        averageScore: 0,
         gamesPlayed: 0,
         averageTime: null,
         fastestTime: null,
-        streakBest: 0
+        fastestCorrectAnswer: null,
+        streakBest: 0,
+        booksCompleted: [],
+        achievementsUnlocked: []
     };
 
     await updateDoc(profileRef, {
@@ -683,6 +698,9 @@ function openProfileEditor(profileUid, profileData) {
         <label>Incorrect</label>
         <input id="editIncorrect" type="number" value="${lifetime.incorrect ?? 0}">
 
+        <label>Total Points</label>
+        <input id="editTotalPoints" type="number" value="${lifetime.totalPoints ?? 0}">
+
         <label>Streak Best</label>
         <input id="editStreakBest" type="number" value="${lifetime.streakBest ?? 0}">
 
@@ -703,6 +721,7 @@ function openProfileEditor(profileUid, profileData) {
         const gamesPlayed = Number(document.getElementById("editGamesPlayed").value) || 0;
         const correct = Number(document.getElementById("editCorrect").value) || 0;
         const incorrect = Number(document.getElementById("editIncorrect").value) || 0;
+        const totalPoints = Number(document.getElementById("editTotalPoints").value) || 0;
         const streakBest = Number(document.getElementById("editStreakBest").value) || 0;
 
         const profileRef = doc(db, "profiles", profileUid);
@@ -715,6 +734,7 @@ function openProfileEditor(profileUid, profileData) {
                 gamesPlayed,
                 correct,
                 incorrect,
+                totalPoints,
                 streakBest,
                 averageTime: p.lifetimeStats?.averageTime ?? null,
                 fastestTime: p.lifetimeStats?.fastestTime ?? null
@@ -806,11 +826,19 @@ function setupFixMissingFields() {
             if (!("lifetimeStats" in data)) {
                 updateData.lifetimeStats = {
                     gamesPlayed: data.gamesPlayed ?? 0,
+                    wins: data.wins ?? 0,
+                    losses: data.losses ?? 0,
                     correct: data.correct ?? 0,
                     incorrect: data.incorrect ?? 0,
+                    totalPoints: data.totalPoints ?? 0,
+                    bestScore: data.bestScore ?? 0,
+                    averageScore: data.averageScore ?? 0,
                     fastestTime: data.fastestTime ?? null,
+                    fastestCorrectAnswer: data.fastestCorrectAnswer ?? null,
                     averageTime: data.averageTime ?? null,
-                    streakBest: data.streakBest ?? 0
+                    streakBest: data.streakBest ?? 0,
+                    booksCompleted: Array.isArray(data.booksCompleted) ? data.booksCompleted : [],
+                    achievementsUnlocked: Array.isArray(data.achievementsUnlocked) ? data.achievementsUnlocked : []
                 };
             }
 

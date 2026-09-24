@@ -170,6 +170,11 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
     <button onclick="switchProfile()">Back</button>
 </div>
 
+<!-- ========================================================= -->
+<!--  SCREEN 0.75: LEADERBOARD                                  -->
+<!-- ========================================================= -->
+<div id="leaderboardScreen" style="display:none;"></div>
+
 
   
 <!-- ========================================================= -->
@@ -184,7 +189,8 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
 "></div>
 <div style="text-align:center; margin-top:10px;">
     <button onclick="switchProfile()">Switch Profile</button>
-    <button onclick="editProfile()">Edit Profile</button>
+    <button onclick="viewCurrentProfile()">View Profile</button>
+  <button onclick="showLeaderboard()">Leaderboard</button>
 </div>
 
   <!-- Mode Selector -->
@@ -192,7 +198,6 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
     <button id="singlePlayerBtn">Single Player</button>
     <button id="localMultiplayerBtn">Local Multiplayer</button>
     <p>Select a mode above to begin.</p> 
-	 <button id="resetBtn" onclick="resetScores()">Reset Scores</button>
 	</div>
 	
 
@@ -307,6 +312,7 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
 
   <button onclick="startLocalMultiplayerGame()">Start Game</button>
   <button onclick="saveOptions()">Save</button>
+  <button id="resetBtn" onclick="resetScores()">Reset Local Scores</button>
   <button onclick="resetDefaults()">Reset to Default Settings</button>
   <button onclick="backToMenu()">Back</button>
 </div>
@@ -349,6 +355,8 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
     doc,
     getDoc,
     getDocs,
+    query,
+    where,
     setDoc,
     updateDoc
   } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
@@ -358,6 +366,8 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
   window.doc = doc;
   window.getDoc = getDoc;
   window.getDocs = getDocs;
+  window.query = query;
+  window.where = where;
   window.setDoc = setDoc;
   window.updateDoc = updateDoc;
 
@@ -384,6 +394,12 @@ button:disabled { background-color: #ddd; color: #666; cursor: not-allowed; }
     .catch(err => console.error("Firebase Auth Error:", err));
 </script>
 
+<script src="quiz-data.js"></script>
+<script src="profile-stats-service.js"></script>
+<script src="profile-service.js"></script>
 <script src="quiz.js"></script>
+<script src="local-multiplayer.js"></script>
+<script src="scoreboard.js"></script>
+<script src="navigation.js"></script>
 </body>
 </html>
