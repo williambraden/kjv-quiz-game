@@ -86,3 +86,57 @@ function isAdmin(profile) {
 function isDeveloper(profile) {
     return profile.role === "developer";
 }
+
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, c => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    }[c]));
+}
+
+async function hashPIN(pin) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hash))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+function isProfileUnlocked(profileId) {
+    return sessionStorage.getItem("profileUnlocked") === profileId;
+}
+
+function unlockProfileSession(profileId) {
+    sessionStorage.setItem("profileUnlocked", profileId);
+}
+
+function clearProfileUnlock() {
+    sessionStorage.removeItem("profileUnlocked");
+}
+
+function normalizeProfileName(name) {
+    return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function rememberProfileOnDevice(profileId) {
+    const rememberedIds = JSON.parse(localStorage.getItem("rememberedProfileIds") || "[]");
+    if (!rememberedIds.includes(profileId)) {
+        rememberedIds.push(profileId);
+        localStorage.setItem("rememberedProfileIds", JSON.stringify(rememberedIds));
+    }
+}
+
+async function loadRememberedProfiles() {
+    const rememberedIds = JSON.parse(localStorage.getItem("rememberedProfileIds") || "[]");
+    const profiles = await Promise.all(rememberedIds.map(profileId =>
+        loadProfile(profileId).catch(err => {
+            console.error("Failed to load remembered profile", profileId, err);
+            return null;
+        })
+    ));
+    return profiles.filter(Boolean);
+}
